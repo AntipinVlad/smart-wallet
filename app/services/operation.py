@@ -24,7 +24,7 @@ def add_income(db: Session, current_user: User, operation: OperationRequest):
         type=OperationType.INCOME,
         amount=operation.amount,
         currency=wallet.currency,
-        category=operation.description
+        description=operation.description
     )
     db.commit()
 
@@ -46,7 +46,7 @@ def add_expense(db: Session, current_user: User, operation: OperationRequest):
         type=OperationType.EXPENSE,
         amount=operation.amount,
         currency=wallet.currency,
-        category=operation.description
+        description=operation.description
     )
     db.commit()
 
@@ -75,7 +75,7 @@ def get_operations_list(
 
 
 async def transfer_between_wallets(db: Session, user_id: int, from_wallet_id: int, to_wallet_id: int,
-                             amount: Decimal) -> list[OperationResponse]:
+                                   amount: Decimal) -> list[OperationResponse]:
     from_wallet = wallet_repository.get_wallet_by_id(db, user_id, from_wallet_id)
     to_wallet = wallet_repository.get_wallet_by_id(db, user_id, to_wallet_id)
 
@@ -101,7 +101,8 @@ async def transfer_between_wallets(db: Session, user_id: int, from_wallet_id: in
         currency=from_wallet.currency,
         category="transfer",
         subcategory="outgoing",
-        transfer_id=transfer_id
+        transfer_id=transfer_id,
+        description=f"Transfer to {to_wallet.name}"
     )
     incoming = operations_repository.create_operation(
         db=db,
@@ -111,7 +112,8 @@ async def transfer_between_wallets(db: Session, user_id: int, from_wallet_id: in
         currency=to_wallet.currency,
         category="transfer",
         subcategory="incoming",
-        transfer_id=transfer_id
+        transfer_id=transfer_id,
+        description=f"Transfer from {from_wallet.name}"
     )
     db.commit()
     return [OperationResponse.model_validate(outgoing), OperationResponse.model_validate(incoming)]

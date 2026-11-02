@@ -1,14 +1,17 @@
 from datetime import datetime
 from decimal import Decimal
+from typing import Annotated
 
 from pydantic import BaseModel, Field, field_validator
 
 from app.enum import CurrencyEnum
 
+Money = Annotated[Decimal, Field(max_digits=18, decimal_places=2)]
+
 
 class OperationRequest(BaseModel):
     wallet_name: str = Field(..., max_length=127)
-    amount: Decimal
+    amount: Money
     description: str | None = Field(None, max_length=255)
 
     @field_validator("amount")
@@ -29,7 +32,7 @@ class OperationRequest(BaseModel):
 
 class CreateWalletRequest(BaseModel):
     name: str = Field(..., max_length=127)
-    initial_balance: Decimal = 0
+    initial_balance: Money = 0
     currency: CurrencyEnum = CurrencyEnum.UAH
 
     @field_validator("initial_balance")
@@ -76,11 +79,12 @@ class OperationResponse(BaseModel):
     subcategory: str | None
     transfer_id: str | None
     created_at: datetime
+    description: str | None
 
 class TransferCreateSchema(BaseModel):
     from_wallet_id: int
     to_wallet_id: int
-    amount: Decimal
+    amount: Money
 
     @field_validator("to_wallet_id")
     @classmethod

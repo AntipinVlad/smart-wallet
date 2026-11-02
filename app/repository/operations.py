@@ -9,14 +9,15 @@ from app.models import Operation
 
 def create_operation(db: Session, wallet_id: int, type: str, amount: Decimal, currency: CurrencyEnum,
                      category: str | None = None, subcategory: str | None = None,
-                     transfer_id: str | None = None) -> Operation:
+                     transfer_id: str | None = None, description: str | None = None) -> Operation:
     operation = Operation(
         wallet_id=wallet_id,
         type=type, amount=amount,
         currency=currency,
         category=category,
         subcategory=subcategory,
-        transfer_id=transfer_id
+        transfer_id=transfer_id,
+        description=description
     )
     db.add(operation)
     db.flush()

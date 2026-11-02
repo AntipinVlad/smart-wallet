@@ -1,5 +1,6 @@
 from decimal import Decimal
 
+import pytest
 from fastapi import HTTPException
 
 from app.enum import CurrencyEnum
@@ -54,6 +55,33 @@ def test_create_wallet_already_exists(client, make_user, make_wallet, auth):
 
     # Assert
     assert response.status_code == 400
+
+
+def test_create_wallet_name_taken_by_concurrent_request(client, make_user, make_wallet, auth, monkeypatch):
+    user = make_user()
+    make_wallet(user, name="card")
+    monkeypatch.setattr("app.repository.wallets.is_wallet_exist", lambda *args: False)
+
+    # Act
+    response = client.post("/api/v1/wallets", json={"name": "card"}, headers=auth(user))
+
+    # Assert
+    assert response.status_code == 400
+
+
+@pytest.mark.parametrize("initial_balance", ["10.001", "12345678901234567.00"])
+def test_create_wallet_balance_out_of_precision(client, make_user, auth, initial_balance):
+    user = make_user()
+
+    # Act
+    response = client.post(
+        "/api/v1/wallets",
+        json={"name": "card", "initial_balance": initial_balance},
+        headers=auth(user)
+    )
+
+    # Assert
+    assert response.status_code == 422
 
 
 def test_create_wallet_same_name_for_different_users(client, make_user, make_wallet, auth):
