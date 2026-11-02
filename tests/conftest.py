@@ -1,39 +1,49 @@
 import os
 from datetime import datetime
 from decimal import Decimal
+from pathlib import Path
 from typing import Callable, Generator
 from unittest.mock import AsyncMock
 
-DATABASE_URL = "sqlite:///./test.db"
+DATABASE_URL = os.environ.get("TEST_DATABASE_URL", "postgresql+psycopg://wallet@127.0.0.1:5433/finance_test")
 
 # Must be set before the app is imported, so tests never touch the working database
 os.environ["DATABASE_URL"] = DATABASE_URL
 
 import pytest
-from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker, Session
+from alembic import command
+from alembic.config import Config
+from sqlalchemy import text
+from sqlalchemy.orm import Session
 from fastapi.testclient import TestClient
 
-from app.database import Base
-from app.dependency import get_db
+from app.database import Base, SessionLocal, engine
 from app.enum import CurrencyEnum, OperationType
 from app.models import Operation, User, Wallet
 from main import app
 
-test_engine = create_engine(DATABASE_URL, connect_args={"check_same_thread": False})
 
-TestSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=test_engine)
-
-
-def get_test_db() -> Generator[Session, None, None]:
-    db = TestSessionLocal()
-    try:
-        yield db
-    finally:
-        db.close()
+@pytest.fixture(scope="session")
+def alembic_config() -> Config:
+    return Config(Path(__file__).parent.parent / "alembic.ini")
 
 
-app.dependency_overrides[get_db] = get_test_db
+@pytest.fixture(scope="session", autouse=True)
+def migrated_db(alembic_config):
+    with engine.begin() as connection:
+        connection.execute(text("DROP SCHEMA public CASCADE"))
+        connection.execute(text("CREATE SCHEMA public"))
+    command.upgrade(alembic_config, "head")
+    yield
+    engine.dispose()
+
+
+@pytest.fixture(autouse=True)
+def clean_tables():
+    yield
+    tables = ", ".join(f'"{table.name}"' for table in Base.metadata.sorted_tables)
+    with engine.begin() as connection:
+        connection.execute(text(f"TRUNCATE {tables} RESTART IDENTITY CASCADE"))
 
 
 @pytest.fixture()
@@ -41,16 +51,9 @@ def client():
     yield TestClient(app)
 
 
-@pytest.fixture(autouse=True)
-def setup_db():
-    Base.metadata.create_all(bind=test_engine)
-    yield
-    Base.metadata.drop_all(bind=test_engine)
-
-
 @pytest.fixture()
 def db_session() -> Generator[Session, None, None]:
-    db = TestSessionLocal()
+    db = SessionLocal()
     try:
         yield db
     finally:

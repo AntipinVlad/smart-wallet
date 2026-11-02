@@ -18,6 +18,17 @@ def test_create_user_already_exists(client, make_user):
     assert response.status_code == 400
 
 
+def test_create_user_login_taken_by_concurrent_request(client, make_user, monkeypatch):
+    make_user(login="user")
+    monkeypatch.setattr("app.repository.users.get_user", lambda *args: None)
+
+    # Act
+    response = client.post("/api/v1/users", json={"login": "user"})
+
+    # Assert
+    assert response.status_code == 400
+
+
 def test_create_user_login_too_long(client):
     # Act
     response = client.post("/api/v1/users", json={"login": "a" * 128})

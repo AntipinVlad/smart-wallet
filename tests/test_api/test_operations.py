@@ -21,6 +21,8 @@ def test_add_income_success(client, db_session, make_user, make_wallet, auth):
     # Assert
     assert response.status_code == 200
     assert response.json()["type"] == "income"
+    assert response.json()["description"] == "Salary"
+    assert response.json()["category"] is None
     assert response.json()["wallet_id"] == wallet.id
     assert Decimal(str(response.json()["amount"])) == Decimal(50)
     assert response.json()["currency"] == "uah"
@@ -42,6 +44,56 @@ def test_add_income_not_positive_amount(client, make_user, make_wallet, auth, am
 
     # Assert
     assert response.status_code == 422
+
+
+def test_add_income_without_description(client, make_user, make_wallet, auth):
+    user = make_user()
+    make_wallet(user)
+
+    # Act
+    response = client.post(
+        "/api/v1/operations/income",
+        json={"wallet_name": "card", "amount": 50.0},
+        headers=auth(user)
+    )
+
+    # Assert
+    assert response.status_code == 200
+    assert response.json()["description"] is None
+
+
+def test_add_income_description_too_long(client, make_user, make_wallet, auth):
+    user = make_user()
+    make_wallet(user)
+
+    # Act
+    response = client.post(
+        "/api/v1/operations/income",
+        json={"wallet_name": "card", "amount": 50.0, "description": "a" * 256},
+        headers=auth(user)
+    )
+
+    # Assert
+    assert response.status_code == 422
+
+
+@pytest.mark.parametrize("endpoint", ["income", "expense"])
+@pytest.mark.parametrize("amount", ["0.001", "12345678901234567.00"])
+def test_operation_amount_out_of_precision(client, db_session, make_user, make_wallet, auth, endpoint, amount):
+    user = make_user()
+    wallet = make_wallet(user, balance=Decimal(200))
+
+    # Act
+    response = client.post(
+        f"/api/v1/operations/{endpoint}",
+        json={"wallet_name": "card", "amount": amount},
+        headers=auth(user)
+    )
+
+    # Assert
+    assert response.status_code == 422
+    db_session.refresh(wallet)
+    assert wallet.balance == Decimal(200)
 
 
 def test_add_income_wallet_not_exist(client, make_user, auth):
@@ -89,6 +141,8 @@ def test_add_expense_success(client, db_session, make_user, make_wallet, auth):
     # Assert
     assert response.status_code == 200
     assert response.json()["type"] == "expense"
+    assert response.json()["description"] == "Food"
+    assert response.json()["category"] is None
     assert response.json()["wallet_id"] == wallet.id
     assert Decimal(str(response.json()["amount"])) == Decimal(50)
     db_session.refresh(wallet)
@@ -279,9 +333,11 @@ def test_transfer_same_currency(client, db_session, make_user, make_wallet, auth
     assert outgoing["type"] == incoming["type"] == "transfer"
     assert outgoing["wallet_id"] == source.id
     assert outgoing["subcategory"] == "outgoing"
+    assert outgoing["description"] == "Transfer to cash"
     assert Decimal(str(outgoing["amount"])) == Decimal(50)
     assert incoming["wallet_id"] == target.id
     assert incoming["subcategory"] == "incoming"
+    assert incoming["description"] == "Transfer from card"
     assert Decimal(str(incoming["amount"])) == Decimal(50)
     db_session.refresh(source)
     db_session.refresh(target)
@@ -470,6 +526,22 @@ def test_transfer_negative_amount(client, make_user, make_wallet, auth):
     response = client.post(
         "/api/v1/operations/transfers",
         json={"from_wallet_id": source.id, "to_wallet_id": target.id, "amount": -50.0},
+        headers=auth(user)
+    )
+
+    # Assert
+    assert response.status_code == 422
+
+
+def test_transfer_amount_out_of_precision(client, make_user, make_wallet, auth):
+    user = make_user()
+    source = make_wallet(user, name="card")
+    target = make_wallet(user, name="cash")
+
+    # Act
+    response = client.post(
+        "/api/v1/operations/transfers",
+        json={"from_wallet_id": source.id, "to_wallet_id": target.id, "amount": "0.001"},
         headers=auth(user)
     )
 
