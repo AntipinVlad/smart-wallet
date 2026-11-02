@@ -2,12 +2,11 @@ import logging
 from decimal import Decimal
 
 from fastapi import HTTPException
-from pydantic import BaseModel
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.enum import CurrencyEnum
-from app.models import User, Wallet
+from app.models import User
 from app.repository import wallets as wallet_repository
 from app.schemas import CreateWalletRequest, WalletResponse, TotalBalance
 from app.services import exchange_service

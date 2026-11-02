@@ -17,7 +17,7 @@ def test_create_wallet_success(client, make_user, auth):
     )
 
     # Assert
-    assert response.status_code == 200
+    assert response.status_code == 201
     assert response.json()["name"] == "card"
     assert Decimal(str(response.json()["balance"])) == Decimal(100)
     assert response.json()["currency"] == "usd"
@@ -30,7 +30,7 @@ def test_create_wallet_default_values(client, make_user, auth):
     response = client.post("/api/v1/wallets", json={"name": "card"}, headers=auth(user))
 
     # Assert
-    assert response.status_code == 200
+    assert response.status_code == 201
     assert Decimal(str(response.json()["balance"])) == Decimal(0)
     assert response.json()["currency"] == "uah"
 
@@ -42,7 +42,7 @@ def test_create_wallet_trims_name(client, make_user, auth):
     response = client.post("/api/v1/wallets", json={"name": "  card  "}, headers=auth(user))
 
     # Assert
-    assert response.status_code == 200
+    assert response.status_code == 201
     assert response.json()["name"] == "card"
 
 
@@ -92,7 +92,7 @@ def test_create_wallet_same_name_for_different_users(client, make_user, make_wal
     response = client.post("/api/v1/wallets", json={"name": "card"}, headers=auth(user))
 
     # Assert
-    assert response.status_code == 200
+    assert response.status_code == 201
 
 
 def test_create_wallet_negative_balance(client, make_user, auth):
