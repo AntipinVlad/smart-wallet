@@ -3,7 +3,7 @@ def test_create_user_success(client):
     response = client.post("/api/v1/users", json={"login": "user"})
 
     # Assert
-    assert response.status_code == 200
+    assert response.status_code == 201
     assert response.json()["login"] == "user"
     assert response.json()["id"] is not None
 

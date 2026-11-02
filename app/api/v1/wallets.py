@@ -1,9 +1,7 @@
-from fastapi import APIRouter
-from fastapi.params import Depends
+from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 
-from app.api.v1.users import get_current_user
-from app.dependency import get_db
+from app.dependency import get_db, get_current_user
 from app.models import User
 from app.schemas import CreateWalletRequest, WalletResponse, TotalBalance
 from app.services import wallets as wallets_service
@@ -17,7 +15,7 @@ async def get_balance(db: Session = Depends(get_db),
     return await wallets_service.get_total_balance(db, current_user)
 
 
-@router.post("/wallets", response_model=WalletResponse)
+@router.post("/wallets", response_model=WalletResponse, status_code=201)
 def create_wallet(wallet: CreateWalletRequest, db: Session = Depends(get_db),
                   current_user: User = Depends(get_current_user)):
     return wallets_service.create_wallet(db, current_user, wallet)
