@@ -4,18 +4,19 @@ from fastapi import HTTPException
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
+from app.core.security import hash_password
 from app.schemas import UserResponse
 from app.repository import users as user_repository
 
 logger = logging.getLogger(__name__)
 
 
-def create_user(db: Session, login: str) -> UserResponse:
+def create_user(db: Session, login: str, password: str) -> UserResponse:
     if user_repository.get_user(db, login):
         raise HTTPException(status_code=400, detail="User already exists")
 
     try:
-        user = user_repository.create_user(db, login)
+        user = user_repository.create_user(db, login, hash_password(password))
         db.commit()
     except IntegrityError as e:
         db.rollback()

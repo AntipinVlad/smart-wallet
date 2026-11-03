@@ -138,7 +138,7 @@ def test_create_wallet_not_authorized(client):
     response = client.post(
         "/api/v1/wallets",
         json={"name": "card"},
-        headers={"Authorization": "Bearer not_exist"}
+        headers={"Cookie": "access_token=not_exist"}
     )
 
     # Assert
@@ -235,7 +235,7 @@ def test_get_balance_ignores_other_users_wallets(client, make_user, make_wallet,
 
 def test_get_balance_not_authorized(client):
     # Act
-    response = client.get("/api/v1/balance", headers={"Authorization": "Bearer not_exist"})
+    response = client.get("/api/v1/balance", headers={"Cookie": "access_token=not_exist"})
 
     # Assert
     assert response.status_code == 401

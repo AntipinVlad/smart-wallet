@@ -9,6 +9,7 @@ DATABASE_URL = os.environ.get("TEST_DATABASE_URL", "postgresql+psycopg://wallet@
 
 # Must be set before the app is imported, so tests never touch the working database
 os.environ["DATABASE_URL"] = DATABASE_URL
+os.environ["JWT_SECRET_KEY"] = "test-only-secret-key-0123456789-0123456789"
 
 import pytest
 from alembic import command
@@ -17,10 +18,15 @@ from sqlalchemy import text
 from sqlalchemy.orm import Session
 from fastapi.testclient import TestClient
 
+from app.core.cookies import ACCESS_TOKEN_COOKIE
+from app.core.security import create_access_token, hash_password
 from app.database import Base, SessionLocal, engine
 from app.enum import CurrencyEnum, OperationType
 from app.models import Operation, User, Wallet
 from main import app
+
+PASSWORD = "correct-password"
+PASSWORD_HASH = hash_password(PASSWORD)
 
 
 @pytest.fixture(scope="session")
@@ -48,7 +54,8 @@ def clean_tables():
 
 @pytest.fixture()
 def client():
-    yield TestClient(app)
+    # https, because the auth cookies are Secure and are never sent over plain http
+    yield TestClient(app, base_url="https://testserver")
 
 
 @pytest.fixture()
@@ -63,7 +70,7 @@ def db_session() -> Generator[Session, None, None]:
 @pytest.fixture()
 def make_user(db_session) -> Callable[..., User]:
     def _make_user(login: str = "user") -> User:
-        user = User(login=login)
+        user = User(login=login, password_hash=PASSWORD_HASH)
         db_session.add(user)
         db_session.commit()
         return user
@@ -99,7 +106,7 @@ def make_operation(db_session) -> Callable[..., Operation]:
 @pytest.fixture()
 def auth() -> Callable[[User], dict[str, str]]:
     def _auth(user: User) -> dict[str, str]:
-        return {"Authorization": f"Bearer {user.login}"}
+        return {"Cookie": f"{ACCESS_TOKEN_COOKIE}={create_access_token(user.id)}"}
 
     return _auth
 
