@@ -1,7 +1,7 @@
 from datetime import datetime
 from decimal import Decimal
 
-from sqlalchemy import DateTime, Enum, ForeignKey, Numeric, String, UniqueConstraint
+from sqlalchemy import CheckConstraint, DateTime, Enum, ForeignKey, Numeric, String, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.database import Base
@@ -26,7 +26,10 @@ class RefreshToken(Base):
 
 class Wallet(Base):
     __tablename__ = "wallet"
-    __table_args__ = (UniqueConstraint("user_id", "name", name="uq_wallet_user_id_name"),)
+    __table_args__ = (
+        UniqueConstraint("user_id", "name", name="uq_wallet_user_id_name"),
+        CheckConstraint("balance >= 0", name="ck_wallet_balance_not_negative"),
+    )
 
     id: Mapped[int] = mapped_column(primary_key=True)
     name: Mapped[str] = mapped_column(String(255))

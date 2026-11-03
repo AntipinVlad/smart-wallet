@@ -14,10 +14,11 @@ from app.services.exchange_service import get_exchange_rate
 
 
 def add_income(db: Session, current_user: User, operation: OperationRequest):
-    if not wallet_repository.is_wallet_exist(db, current_user.id, operation.wallet_name):
+    wallet = wallet_repository.get_wallet_by_name_for_update(db, current_user.id, operation.wallet_name)
+    if not wallet:
         raise HTTPException(status_code=404, detail=f"Wallet '{operation.wallet_name}' not found")
 
-    wallet = wallet_repository.add_income(db, current_user.id, operation.wallet_name, operation.amount)
+    wallet.balance += operation.amount
     operation = operations_repository.create_operation(
         db=db,
         wallet_id=wallet.id,
@@ -32,14 +33,14 @@ def add_income(db: Session, current_user: User, operation: OperationRequest):
 
 
 def add_expense(db: Session, current_user: User, operation: OperationRequest):
-    if not wallet_repository.is_wallet_exist(db, current_user.id, operation.wallet_name):
+    wallet = wallet_repository.get_wallet_by_name_for_update(db, current_user.id, operation.wallet_name)
+    if not wallet:
         raise HTTPException(status_code=404, detail=f"Wallet '{operation.wallet_name}' not found")
 
-    wallet = wallet_repository.get_wallet_balance_by_name(db, current_user.id, operation.wallet_name)
     if wallet.balance < operation.amount:
         raise HTTPException(status_code=400, detail=f"Insufficient funds. Available: {wallet.balance}")
 
-    wallet = wallet_repository.add_expense(db, current_user.id, operation.wallet_name, operation.amount)
+    wallet.balance -= operation.amount
     operation = operations_repository.create_operation(
         db=db,
         wallet_id=wallet.id,
@@ -82,13 +83,19 @@ async def transfer_between_wallets(db: Session, user_id: int, from_wallet_id: in
     if not from_wallet or not to_wallet:
         raise HTTPException(404, "Wallet not found")
 
-    if from_wallet.balance < amount:
-        raise HTTPException(400, f"Not enough funds. Available: {from_wallet.balance} {from_wallet.currency}")
-
+    # The rate is requested before locking: waiting for an external API while holding the locks
+    # would block every other operation on both wallets
     target_amount = amount
     if from_wallet.currency != to_wallet.currency:
         exchange_rate = await get_exchange_rate(from_wallet.currency, to_wallet.currency)
         target_amount = round(amount * exchange_rate, 2)
+
+    # Balances read above may already be outdated. Locking loads the same session objects again
+    # with the current row values, so from_wallet and to_wallet are up to date after this line
+    wallet_repository.get_wallets_by_ids_for_update(db, user_id, [from_wallet.id, to_wallet.id])
+
+    if from_wallet.balance < amount:
+        raise HTTPException(400, f"Not enough funds. Available: {from_wallet.balance} {from_wallet.currency}")
 
     from_wallet.balance = round(from_wallet.balance - amount, 2)
     to_wallet.balance = round(to_wallet.balance + target_amount, 2)

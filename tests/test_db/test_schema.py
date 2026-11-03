@@ -79,3 +79,11 @@ def test_balance_keeps_exact_decimal_value(client, db_session, make_user, make_w
     # Assert
     db_session.refresh(wallet)
     assert str(wallet.balance) == "0.30"
+
+
+def test_wallet_balance_cannot_be_negative(make_user, make_wallet):
+    user = make_user()
+
+    # Act
+    with pytest.raises(IntegrityError):
+        make_wallet(user, balance=Decimal("-0.01"))
