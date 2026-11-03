@@ -19,6 +19,9 @@ htmlcov/
 .env.*
 !.env.example
 
+# Local notes
+docs/
+
 # IDE
 .idea/
 .vscode/

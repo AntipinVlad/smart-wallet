@@ -55,6 +55,19 @@ class UserRequest(BaseModel):
     login: str = Field(..., max_length=127)
 
 
+class UserCreateRequest(UserRequest):
+    password: str = Field(..., min_length=8, max_length=128)
+
+
+class LoginRequest(UserRequest):
+    password: str = Field(..., max_length=128)
+
+
+class TokenPair(BaseModel):
+    access_token: str
+    refresh_token: str
+
+
 class UserResponse(UserRequest):
     model_config = {"from_attributes": True}
     id: int

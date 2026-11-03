@@ -232,7 +232,7 @@ def test_add_expense_not_authorized(client):
     response = client.post(
         "/api/v1/operations/expense",
         json={"wallet_name": "card", "amount": 50.0},
-        headers={"Authorization": "Bearer not_exist"}
+        headers={"Cookie": "access_token=not_exist"}
     )
 
     # Assert
@@ -309,7 +309,7 @@ def test_get_operations_by_date_range(client, make_user, make_wallet, make_opera
 
 def test_get_operations_not_authorized(client):
     # Act
-    response = client.get("/api/v1/operations", headers={"Authorization": "Bearer not_exist"})
+    response = client.get("/api/v1/operations", headers={"Cookie": "access_token=not_exist"})
 
     # Assert
     assert response.status_code == 401
@@ -554,7 +554,7 @@ def test_transfer_not_authorized(client):
     response = client.post(
         "/api/v1/operations/transfers",
         json={"from_wallet_id": 1, "to_wallet_id": 2, "amount": 50.0},
-        headers={"Authorization": "Bearer not_exist"}
+        headers={"Cookie": "access_token=not_exist"}
     )
 
     # Assert
