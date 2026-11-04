@@ -1,4 +1,5 @@
 from decimal import Decimal
+from unittest.mock import AsyncMock
 
 import pytest
 from fastapi import HTTPException
@@ -60,7 +61,7 @@ def test_create_wallet_already_exists(client, make_user, make_wallet, auth):
 def test_create_wallet_name_taken_by_concurrent_request(client, make_user, make_wallet, auth, monkeypatch):
     user = make_user()
     make_wallet(user, name="card")
-    monkeypatch.setattr("app.repository.wallets.is_wallet_exist", lambda *args: False)
+    monkeypatch.setattr("app.repository.wallets.is_wallet_exist", AsyncMock(return_value=False))
 
     # Act
     response = client.post("/api/v1/wallets", json={"name": "card"}, headers=auth(user))
@@ -206,7 +207,7 @@ def test_get_balance_converts_foreign_currency_to_uah(client, make_user, make_wa
     # Assert
     assert response.status_code == 200
     assert Decimal(str(response.json()["total_balance"])) == Decimal(500)
-    mock_exchange_rate.assert_awaited_once_with(CurrencyEnum.USD, CurrencyEnum.UAH)
+    mock_exchange_rate.assert_awaited_once_with(client.app_state["http_session"], CurrencyEnum.USD, CurrencyEnum.UAH)
 
 
 def test_get_balance_exchange_rate_not_found(client, make_user, make_wallet, auth, mock_exchange_rate):

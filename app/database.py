@@ -1,12 +1,13 @@
-from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker, declarative_base
+from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
+from sqlalchemy.orm import declarative_base
 
 from app.core.config import settings
 
-engine = create_engine(settings.database_url)
+# The same postgresql+psycopg URL works for async: psycopg 3 has both modes, Alembic keeps using the sync one
+engine = create_async_engine(settings.database_url)
 
-SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+# expire_on_commit=False: after commit the objects keep their values. Otherwise reading any attribute
+# would load it from the database again, and in async code that implicit query fails
+SessionLocal = async_sessionmaker(bind=engine, autoflush=False, expire_on_commit=False)
 
 Base = declarative_base()
-
-

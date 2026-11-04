@@ -1,11 +1,29 @@
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
+
+import aiohttp
 from fastapi import FastAPI
 
 from app.api.v1.auth import router as auth_router
 from app.api.v1.wallets import router as wallet_router
 from app.api.v1.operations import router as operation_router
 from app.api.v1.users import router as users_router
+from app.core.config import settings
+from app.database import engine
+from app.dependency import AppState
 
-app = FastAPI()
+
+@asynccontextmanager
+async def lifespan(_: FastAPI) -> AsyncIterator[AppState]:
+    # One HTTP session for the whole app: it keeps connections to external APIs open between requests
+    timeout = aiohttp.ClientTimeout(total=settings.exchange_api_timeout_seconds)
+    async with aiohttp.ClientSession(timeout=timeout) as http_session:
+        yield AppState(http_session=http_session)
+    # Database connections belong to the event loop that opened them, so they are closed together with it
+    await engine.dispose()
+
+
+app = FastAPI(lifespan=lifespan)
 
 app.include_router(auth_router, prefix="/api/v1", tags=["auth"])
 app.include_router(users_router, prefix="/api/v1", tags=["users"])

@@ -5,8 +5,8 @@ While the row is locked the test changes the balance and commits. A request that
 before reading it waits and sees the new balance. A request that reads without a lock works with
 the old balance and overwrites the concurrent change.
 """
-from collections.abc import Callable, Generator
-from concurrent.futures import Future, ThreadPoolExecutor
+from collections.abc import Generator
+from concurrent.futures import Future
 from contextlib import contextmanager
 from decimal import Decimal
 
@@ -14,18 +14,20 @@ import pytest
 from sqlalchemy.exc import OperationalError
 from sqlalchemy.orm import Session
 
-from app.database import SessionLocal
 from app.enum import CurrencyEnum
 from app.models import Wallet
+from tests.conftest import SyncSessionLocal
 
 # How long a request is given to reach the lock. Long enough for a local request, short enough for the suite
 REQUEST_START_SECONDS = 0.5
 REQUEST_FINISH_SECONDS = 10
+# A request that does not wait for anything answers well within this time
+OTHER_REQUEST_SECONDS = 2
 
 
 @contextmanager
 def locked_wallet(wallet_id: int) -> Generator[Wallet, None, None]:
-    db = SessionLocal()
+    db = SyncSessionLocal()
     try:
         yield db.query(Wallet).filter(Wallet.id == wallet_id).with_for_update().one()
         db.commit()
@@ -39,7 +41,7 @@ def assert_still_waiting(request: Future) -> None:
 
 
 def is_wallet_lock_free(wallet_id: int) -> bool:
-    db: Session = SessionLocal()
+    db: Session = SyncSessionLocal()
     try:
         db.query(Wallet).filter(Wallet.id == wallet_id).with_for_update(nowait=True).one()
         return True
@@ -48,12 +50,6 @@ def is_wallet_lock_free(wallet_id: int) -> bool:
     finally:
         db.rollback()
         db.close()
-
-
-@pytest.fixture()
-def run_in_background() -> Generator[Callable[..., Future], None, None]:
-    with ThreadPoolExecutor(max_workers=1) as pool:
-        yield pool.submit
 
 
 def test_income_is_not_lost_on_concurrent_balance_change(client, db_session, make_user, make_wallet, auth,
@@ -176,3 +172,42 @@ def test_transfer_gets_exchange_rate_before_waiting_for_lock(client, make_user, 
     # Assert
     assert rate_requested_while_waiting
     assert response.status_code == 200
+
+
+def test_transfer_waiting_for_lock_does_not_block_other_requests(client, make_user, make_wallet, auth,
+                                                                 run_in_background):
+    # One server process serves all requests in one event loop. Waiting for the database must not stop it
+    user = make_user()
+    source = make_wallet(user, name="card", balance=Decimal(100))
+    target = make_wallet(user, name="cash", balance=Decimal(100))
+
+    # Act
+    with locked_wallet(source.id):
+        transfer = run_in_background(client.post, "/api/v1/operations/transfers",
+                                     json={"from_wallet_id": source.id, "to_wallet_id": target.id, "amount": 50},
+                                     headers=auth(user))
+        assert_still_waiting(transfer)
+        other = run_in_background(client.get, "/api/v1/users/me", headers=auth(user))
+        other_response = other.result(timeout=OTHER_REQUEST_SECONDS)
+    transfer.result(timeout=REQUEST_FINISH_SECONDS)
+
+    # Assert
+    assert other_response.status_code == 200
+
+
+def test_expense_waiting_for_lock_does_not_block_other_requests(client, make_user, make_wallet, auth,
+                                                                run_in_background):
+    user = make_user()
+    wallet = make_wallet(user, balance=Decimal(100))
+
+    # Act
+    with locked_wallet(wallet.id):
+        expense = run_in_background(client.post, "/api/v1/operations/expense",
+                                    json={"wallet_name": "card", "amount": 50}, headers=auth(user))
+        assert_still_waiting(expense)
+        other = run_in_background(client.get, "/api/v1/users/me", headers=auth(user))
+        other_response = other.result(timeout=OTHER_REQUEST_SECONDS)
+    expense.result(timeout=REQUEST_FINISH_SECONDS)
+
+    # Assert
+    assert other_response.status_code == 200
