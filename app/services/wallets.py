@@ -1,9 +1,10 @@
 import logging
 from decimal import Decimal
 
+import aiohttp
 from fastapi import HTTPException
 from sqlalchemy.exc import IntegrityError
-from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.enum import CurrencyEnum
 from app.models import User
@@ -14,36 +15,40 @@ from app.services import exchange_service
 logger = logging.getLogger(__name__)
 
 
-async def get_total_balance(db: Session, current_user: User) -> TotalBalance:
-    wallets = wallet_repository.get_all_wallets(db, current_user.id)
+async def get_total_balance(db: AsyncSession, http_session: aiohttp.ClientSession,
+                            current_user: User) -> TotalBalance:
+    wallets = await wallet_repository.get_all_wallets(db, current_user.id)
     total_balance = Decimal(0)
 
     for wallet in wallets:
         if wallet.currency == CurrencyEnum.UAH:
             total_balance += wallet.balance
         else:
-            exchange_rate = await exchange_service.get_exchange_rate(wallet.currency, CurrencyEnum.UAH)
+            exchange_rate = await exchange_service.get_exchange_rate(http_session, wallet.currency, CurrencyEnum.UAH)
             total_balance += round((wallet.balance * exchange_rate), 2)
 
     return TotalBalance(total_balance=total_balance)
 
 
-def create_wallet(db: Session, current_user: User, wallet: CreateWalletRequest) -> WalletResponse:
-    if wallet_repository.is_wallet_exist(db, current_user.id, wallet.name):
+async def create_wallet(db: AsyncSession, current_user: User, wallet: CreateWalletRequest) -> WalletResponse:
+    # A failed insert expires every object in the session, current_user too. Reading its attributes afterwards
+    # would need a new query, which async SQLAlchemy does not run implicitly, so the id is kept here
+    user_id = current_user.id
+    if await wallet_repository.is_wallet_exist(db, user_id, wallet.name):
         raise HTTPException(status_code=400, detail=f"Wallet '{wallet.name}' already exists")
 
     try:
-        wallet = wallet_repository.create_wallet(db, current_user.id, wallet.name, wallet.initial_balance,
-                                                 wallet.currency)
-        db.commit()
+        wallet = await wallet_repository.create_wallet(db, user_id, wallet.name, wallet.initial_balance,
+                                                       wallet.currency)
+        await db.commit()
     except IntegrityError as e:
-        db.rollback()
-        logger.warning("Wallet '%s' for user %s was created by a concurrent request", wallet.name, current_user.id)
+        await db.rollback()
+        logger.warning("Wallet '%s' for user %s was created by a concurrent request", wallet.name, user_id)
         raise HTTPException(status_code=400, detail=f"Wallet '{wallet.name}' already exists") from e
 
     return WalletResponse.model_validate(wallet)
 
 
-def get_all_wallets(db: Session, current_user: User) -> list[WalletResponse]:
-    wallets = wallet_repository.get_all_wallets(db, current_user.id)
+async def get_all_wallets(db: AsyncSession, current_user: User) -> list[WalletResponse]:
+    wallets = await wallet_repository.get_all_wallets(db, current_user.id)
     return [WalletResponse.model_validate(wallet) for wallet in wallets]

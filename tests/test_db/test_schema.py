@@ -5,7 +5,7 @@ from alembic import command
 from sqlalchemy import inspect
 from sqlalchemy.exc import IntegrityError
 
-from app.database import engine
+from tests.conftest import sync_engine
 
 
 def test_models_match_migrations(alembic_config):
@@ -25,7 +25,7 @@ def test_migrations_can_be_rolled_back(alembic_config):
 @pytest.mark.parametrize("table, column", [("wallet", "balance"), ("operation", "amount")])
 def test_money_columns_have_fixed_precision(table, column):
     # Act
-    columns = {item["name"]: item["type"] for item in inspect(engine).get_columns(table)}
+    columns = {item["name"]: item["type"] for item in inspect(sync_engine).get_columns(table)}
 
     # Assert
     assert (columns[column].precision, columns[column].scale) == (18, 2)
@@ -40,7 +40,7 @@ def test_money_columns_have_fixed_precision(table, column):
 ])
 def test_text_columns_are_limited_to_255_characters(table, column):
     # Act
-    columns = {item["name"]: item["type"] for item in inspect(engine).get_columns(table)}
+    columns = {item["name"]: item["type"] for item in inspect(sync_engine).get_columns(table)}
 
     # Assert
     assert columns[column].length == 255

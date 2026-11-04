@@ -364,7 +364,7 @@ def test_transfer_converts_currency(client, db_session, make_user, make_wallet, 
     assert outgoing["currency"] == "usd"
     assert Decimal(str(incoming["amount"])) == Decimal(2000)
     assert incoming["currency"] == "uah"
-    mock_exchange_rate.assert_awaited_once_with(CurrencyEnum.USD, CurrencyEnum.UAH)
+    mock_exchange_rate.assert_awaited_once_with(client.app_state["http_session"], CurrencyEnum.USD, CurrencyEnum.UAH)
     db_session.refresh(source)
     db_session.refresh(target)
     assert source.balance == Decimal(150)

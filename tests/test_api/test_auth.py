@@ -4,12 +4,14 @@ import jwt
 
 from app.core.config import settings
 from app.core.cookies import ACCESS_TOKEN_COOKIE, REFRESH_TOKEN_COOKIE
-from app.core.security import create_access_token, hash_refresh_token
+from app.core.security import create_access_token, hash_refresh_token, verify_password
 from app.models import RefreshToken, User
-from tests.conftest import PASSWORD
+from tests.conftest import PASSWORD, Pause
 
 REFRESH_URL = "/api/v1/auth/refresh"
 LOGOUT_URL = "/api/v1/auth/logout"
+# A request that does not wait for anything answers well within this time
+OTHER_REQUEST_SECONDS = 2
 
 
 def login(client, user_login: str = "user", password: str = PASSWORD):
@@ -322,3 +324,23 @@ def test_login_cannot_be_used_as_access_token(client, make_user):
 
     # Assert
     assert response.status_code == 401
+
+
+def test_slow_password_check_does_not_block_other_requests(client, make_user, auth, monkeypatch, run_in_background):
+    # Checking a password takes tens of milliseconds of CPU. In the event loop it would stop every other request
+    user = make_user()
+    pause = Pause()
+    monkeypatch.setattr("app.services.auth.verify_password", pause.wrap(verify_password))
+
+    # Act
+    try:
+        login_request = run_in_background(login, client)
+        assert pause.entered.wait(timeout=5)
+        other = run_in_background(client.get, "/api/v1/users/me", headers=auth(user))
+        other_response = other.result(timeout=OTHER_REQUEST_SECONDS)
+    finally:
+        pause.released.set()
+
+    # Assert
+    assert other_response.status_code == 200
+    assert login_request.result(timeout=10).status_code == 204

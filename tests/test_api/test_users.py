@@ -1,7 +1,13 @@
+from unittest.mock import AsyncMock
+
 from sqlalchemy import select
 
+from app.core.security import hash_password
 from app.models import User
-from tests.conftest import PASSWORD
+from tests.conftest import PASSWORD, Pause
+
+# A request that does not wait for anything answers well within this time
+OTHER_REQUEST_SECONDS = 2
 
 
 def test_create_user_success(client):
@@ -53,7 +59,7 @@ def test_create_user_already_exists(client, make_user):
 
 def test_create_user_login_taken_by_concurrent_request(client, make_user, monkeypatch):
     make_user(login="user")
-    monkeypatch.setattr("app.repository.users.get_user", lambda *args: None)
+    monkeypatch.setattr("app.repository.users.get_user", AsyncMock(return_value=None))
 
     # Act
     response = client.post("/api/v1/users", json={"login": "user", "password": PASSWORD})
@@ -95,3 +101,24 @@ def test_get_me_without_token(client):
 
     # Assert
     assert response.status_code == 401
+
+
+def test_slow_password_hashing_does_not_block_other_requests(client, make_user, auth, monkeypatch,
+                                                             run_in_background):
+    # Hashing a password takes tens of milliseconds of CPU. In the event loop it would stop every other request
+    user = make_user()
+    pause = Pause()
+    monkeypatch.setattr("app.services.users.hash_password", pause.wrap(hash_password))
+
+    # Act
+    try:
+        registration = run_in_background(client.post, "/api/v1/users", json={"login": "new", "password": PASSWORD})
+        assert pause.entered.wait(timeout=5)
+        other = run_in_background(client.get, "/api/v1/users/me", headers=auth(user))
+        other_response = other.result(timeout=OTHER_REQUEST_SECONDS)
+    finally:
+        pause.released.set()
+
+    # Assert
+    assert other_response.status_code == 200
+    assert registration.result(timeout=10).status_code == 201
