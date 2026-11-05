@@ -15,6 +15,7 @@ class ErrorCode(StrEnum):
     EXCHANGE_RATE_NOT_FOUND = "EXCHANGE_RATE_NOT_FOUND"
     EXCHANGE_SERVICE_UNAVAILABLE = "EXCHANGE_SERVICE_UNAVAILABLE"
     DATABASE_UNAVAILABLE = "DATABASE_UNAVAILABLE"
+    RATE_LIMIT_EXCEEDED = "RATE_LIMIT_EXCEEDED"
 
     # No error class: set by the handlers in app/api/errors.py
     VALIDATION_ERROR = "VALIDATION_ERROR"
@@ -28,6 +29,7 @@ class AppError(Exception):
     """An error the client may see. Services raise it instead of HTTPException, so they do not depend on HTTP."""
 
     code: ErrorCode
+    headers: dict[str, str] | None = None
 
     def __init__(self, message: str) -> None:
         super().__init__(message)
@@ -47,6 +49,10 @@ class ConflictError(AppError):
 
 class AuthenticationError(AppError):
     """The client is not authenticated: no token, an invalid token, or wrong credentials."""
+
+
+class TooManyRequestsError(AppError):
+    """The client sent too many requests in a short time and has to wait."""
 
 
 class ExternalServiceError(AppError):
@@ -125,3 +131,11 @@ class DatabaseUnavailableError(ExternalServiceUnavailableError):
 
     def __init__(self) -> None:
         super().__init__("Database unavailable")
+
+
+class RateLimitExceededError(TooManyRequestsError):
+    code = ErrorCode.RATE_LIMIT_EXCEEDED
+
+    def __init__(self, retry_after_seconds: int) -> None:
+        super().__init__("Too many requests, try again later")
+        self.headers = {"Retry-After": str(retry_after_seconds)}

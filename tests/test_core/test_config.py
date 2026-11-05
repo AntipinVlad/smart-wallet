@@ -33,7 +33,7 @@ def test_settings_read_from_env_file(monkeypatch, tmp_path):
     assert settings.database_url == "sqlite:///./from_file.db"
 
 
-@pytest.mark.parametrize("name", ["DATABASE_URL", "JWT_SECRET_KEY"])
+@pytest.mark.parametrize("name", ["DATABASE_URL", "JWT_SECRET_KEY", "REDIS_URL"])
 def test_settings_require_value(monkeypatch, name):
     monkeypatch.delenv(name)
 

@@ -43,7 +43,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
 
-    # Same image and settings as db-test in docker-compose.yml
+    # Same images and settings as db-test and redis-test in docker-compose.yml
     services:
       postgres:
         image: postgres:17-alpine
@@ -58,9 +58,19 @@ jobs:
           --health-interval 2s
           --health-timeout 3s
           --health-retries 15
+      redis:
+        image: redis:8.10-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 2s
+          --health-timeout 3s
+          --health-retries 15
 
     env:
       TEST_DATABASE_URL: postgresql+psycopg://wallet@127.0.0.1:5432/finance_test
+      TEST_REDIS_URL: redis://127.0.0.1:6379/0
 
     steps:
       - uses: actions/checkout@v7.0.1

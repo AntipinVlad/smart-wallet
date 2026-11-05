@@ -10,13 +10,16 @@ from typing import Any
 from unittest.mock import AsyncMock
 
 DATABASE_URL = os.environ.get("TEST_DATABASE_URL", "postgresql+psycopg://wallet@127.0.0.1:5433/finance_test")
+REDIS_URL = os.environ.get("TEST_REDIS_URL", "redis://127.0.0.1:6380/0")
 
 # Before the app is imported, so tests never touch the working database
 os.environ["DATABASE_URL"] = DATABASE_URL
+os.environ["REDIS_URL"] = REDIS_URL
 os.environ["JWT_SECRET_KEY"] = "test-only-secret-key-0123456789-0123456789"
 
 import httpx2
 import pytest
+import redis
 from alembic.config import Config
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine, text
@@ -37,6 +40,7 @@ PASSWORD_HASH = hash_password(PASSWORD)
 
 sync_engine = create_engine(DATABASE_URL)
 SyncSessionLocal = sessionmaker(bind=sync_engine)
+sync_redis = redis.Redis.from_url(REDIS_URL)
 
 
 class Pause:
@@ -75,6 +79,12 @@ def migrated_db(alembic_config):
     command.upgrade(alembic_config, "head")
     yield
     sync_engine.dispose()
+
+
+@pytest.fixture(autouse=True)
+def clean_redis():
+    # Login tests share one client IP: counters from earlier tests would hit the limits
+    sync_redis.flushdb()
 
 
 @pytest.fixture(autouse=True)
