@@ -1,5 +1,7 @@
+import tomllib
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
+from pathlib import Path
 
 import aiohttp
 from fastapi import FastAPI
@@ -16,6 +18,11 @@ from app.api.v1.wallets import router as wallet_router
 from app.core.config import settings
 from app.core.logging import setup_logging
 from app.database import engine
+
+# Only in pyproject.toml, bumped with: uv version --bump patch|minor|major
+VERSION = tomllib.loads((Path(__file__).parent.parent / "pyproject.toml").read_text(encoding="utf-8"))["project"][
+    "version"
+]
 
 # Before anything logs
 setup_logging(settings.log_level, settings.log_format)
@@ -37,7 +44,7 @@ async def lifespan(_: FastAPI) -> AsyncIterator[AppState]:
     await engine.dispose()
 
 
-app = FastAPI(lifespan=lifespan, responses=INTERNAL_ERROR_RESPONSES)
+app = FastAPI(title="Smart Wallet", version=VERSION, lifespan=lifespan, responses=INTERNAL_ERROR_RESPONSES)
 register_exception_handlers(app)
 app.add_middleware(RequestContextMiddleware)
 
