@@ -3,6 +3,7 @@ from contextlib import asynccontextmanager
 
 import aiohttp
 from fastapi import FastAPI
+from redis.asyncio import Redis
 
 from app.api.deps import AppState
 from app.api.errors import INTERNAL_ERROR_RESPONSES, register_exception_handlers
@@ -24,8 +25,14 @@ setup_logging(settings.log_level, settings.log_format)
 async def lifespan(_: FastAPI) -> AsyncIterator[AppState]:
     # One session for the app: connections stay open between requests
     timeout = aiohttp.ClientTimeout(total=settings.exchange_api_timeout_seconds)
-    async with aiohttp.ClientSession(timeout=timeout) as http_session:
-        yield AppState(http_session=http_session)
+    # Connects on the first command: the app starts even when Redis is down
+    redis = Redis.from_url(
+        settings.redis_url,
+        socket_timeout=settings.redis_timeout_seconds,
+        socket_connect_timeout=settings.redis_timeout_seconds,
+    )
+    async with aiohttp.ClientSession(timeout=timeout) as http_session, redis:
+        yield AppState(http_session=http_session, redis=redis)
     # Database connections belong to this event loop, so they are closed before it stops
     await engine.dispose()
 

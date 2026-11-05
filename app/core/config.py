@@ -8,6 +8,8 @@ class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
     database_url: str
+    redis_url: str
+    redis_timeout_seconds: float = 1.0
     exchange_api_url: str = "https://cdn.jsdelivr.net/npm/@fawazahmed0/currency-api@latest/v1"
     exchange_api_timeout_seconds: float = 5.0
     jwt_secret_key: str = Field(min_length=32)
@@ -17,6 +19,9 @@ class Settings(BaseSettings):
     health_check_timeout_seconds: float = 2.0
     default_page_size: int = Field(default=20, ge=1)
     max_page_size: int = Field(default=100, ge=1)
+    login_rate_limit_per_ip: int = Field(default=20, ge=1)
+    login_rate_limit_per_login: int = Field(default=5, ge=1)
+    login_rate_limit_window_seconds: int = Field(default=60, ge=1)
     log_level: LogLevel = "INFO"
     log_format: LogFormat = "text"
 

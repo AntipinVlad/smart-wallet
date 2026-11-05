@@ -16,6 +16,7 @@ from app.core.exceptions import (
     ExternalServiceError,
     ExternalServiceUnavailableError,
     NotFoundError,
+    TooManyRequestsError,
 )
 from app.schemas import ErrorResponse
 
@@ -26,6 +27,7 @@ STATUS_BY_ERROR_GROUP: dict[type[AppError], int] = {
     NotFoundError: 404,
     ConflictError: 409,
     AuthenticationError: 401,
+    TooManyRequestsError: 429,
     ExternalServiceError: 502,
     ExternalServiceUnavailableError: 503,
 }
@@ -52,7 +54,7 @@ def error_response(
 
 
 async def handle_app_error(_: Request, error: AppError) -> JSONResponse:
-    return error_response(status_code_for(type(error)), error.code, error.message)
+    return error_response(status_code_for(type(error)), error.code, error.message, headers=error.headers)
 
 
 async def handle_http_exception(_: Request, error: StarletteHTTPException) -> JSONResponse:
