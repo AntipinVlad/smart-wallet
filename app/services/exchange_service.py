@@ -10,8 +10,7 @@ from app.enums import CurrencyEnum
 logger = logging.getLogger(__name__)
 
 
-async def get_exchange_rate(http_session: aiohttp.ClientSession, base: CurrencyEnum,
-                            target: CurrencyEnum) -> Decimal:
+async def get_exchange_rate(http_session: aiohttp.ClientSession, base: CurrencyEnum, target: CurrencyEnum) -> Decimal:
     url = f"{settings.exchange_api_url}/currencies/{base}.json"
     try:
         # The session is shared and closed in lifespan, so only the response is closed here

@@ -1,8 +1,9 @@
 import json
 import logging
 import logging.config
+from collections.abc import Callable
 from contextvars import ContextVar
-from datetime import datetime, UTC
+from datetime import UTC, datetime
 from typing import Any, Literal
 
 LogLevel = Literal["DEBUG", "INFO", "WARNING", "ERROR"]
@@ -14,8 +15,12 @@ request_id_var: ContextVar[str | None] = ContextVar("request_id", default=None)
 
 # Attributes every LogRecord has. Everything else on a record came from `extra=` and is written as a field.
 # color_message: uvicorn's copy of the message with terminal colors
-_STANDARD_RECORD_ATTRIBUTES = set(vars(logging.makeLogRecord({}))) | {"message", "asctime", "request_id",
-                                                                      "color_message"}
+_STANDARD_RECORD_ATTRIBUTES = set(vars(logging.makeLogRecord({}))) | {
+    "message",
+    "asctime",
+    "request_id",
+    "color_message",
+}
 
 
 class JsonFormatter(logging.Formatter):
@@ -47,36 +52,38 @@ class TextFormatter(logging.Formatter):
         return super().format(record)
 
 
-def _add_request_id(factory: Any) -> Any:
+class _RequestIdRecordFactory:
     # A record factory, not a handler filter: it runs for every record, also for handlers added by others
     # (pytest caplog, for example), so request_id is always there
-    def make_record(*args: Any, **kwargs: Any) -> logging.LogRecord:
-        record = factory(*args, **kwargs)
+    def __init__(self, factory: Callable[..., logging.LogRecord]) -> None:
+        self._factory = factory
+
+    def __call__(self, *args: Any, **kwargs: Any) -> logging.LogRecord:
+        record = self._factory(*args, **kwargs)
         record.request_id = request_id_var.get()
         return record
-
-    make_record.adds_request_id = True
-    return make_record
 
 
 def setup_logging(level: LogLevel, log_format: LogFormat) -> None:
     formatter = JsonFormatter if log_format == "json" else TextFormatter
-    logging.config.dictConfig({
-        "version": 1,
-        # Loggers created before this call (by uvicorn, sqlalchemy) keep working
-        "disable_existing_loggers": False,
-        "formatters": {"default": {"()": formatter}},
-        "handlers": {"default": {"class": "logging.StreamHandler", "formatter": "default"}},
-        "root": {"level": level, "handlers": ["default"]},
-        "loggers": {
-            # uvicorn has its own handlers: drop them, so its messages go through ours in the same format
-            "uvicorn": {"handlers": [], "propagate": True},
-            "uvicorn.error": {"handlers": [], "propagate": True},
-            "uvicorn.access": {"handlers": [], "propagate": False},
-        },
-    })
+    logging.config.dictConfig(
+        {
+            "version": 1,
+            # Loggers created before this call (by uvicorn, sqlalchemy) keep working
+            "disable_existing_loggers": False,
+            "formatters": {"default": {"()": formatter}},
+            "handlers": {"default": {"class": "logging.StreamHandler", "formatter": "default"}},
+            "root": {"level": level, "handlers": ["default"]},
+            "loggers": {
+                # uvicorn has its own handlers: drop them, so its messages go through ours in the same format
+                "uvicorn": {"handlers": [], "propagate": True},
+                "uvicorn.error": {"handlers": [], "propagate": True},
+                "uvicorn.access": {"handlers": [], "propagate": False},
+            },
+        }
+    )
     # Every request is logged by RequestContextMiddleware with the request id, this would repeat it
     logging.getLogger("uvicorn.access").disabled = True
     factory = logging.getLogRecordFactory()
-    if not getattr(factory, "adds_request_id", False):
-        logging.setLogRecordFactory(_add_request_id(factory))
+    if not isinstance(factory, _RequestIdRecordFactory):
+        logging.setLogRecordFactory(_RequestIdRecordFactory(factory))

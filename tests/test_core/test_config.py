@@ -42,11 +42,14 @@ def test_settings_require_value(monkeypatch, name):
         Settings(_env_file=None)
 
 
-@pytest.mark.parametrize("name, value", [
-    ("JWT_SECRET_KEY", "too-short"),
-    ("LOG_LEVEL", "VERBOSE"),
-    ("LOG_FORMAT", "xml"),
-])
+@pytest.mark.parametrize(
+    "name, value",
+    [
+        ("JWT_SECRET_KEY", "too-short"),
+        ("LOG_LEVEL", "VERBOSE"),
+        ("LOG_FORMAT", "xml"),
+    ],
+)
 def test_settings_reject_invalid_value(monkeypatch, name, value):
     monkeypatch.setenv(name, value)
 

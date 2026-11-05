@@ -18,5 +18,51 @@ dependencies = [
 [dependency-groups]
 dev = [
     "httpx2==2.16.0",
+    "mypy==2.4.1",
     "pytest==9.2.0",
+    "ruff==0.17.3",
 ]
+
+[tool.ruff]
+target-version = "py312"
+line-length = 120
+
+[tool.ruff.lint]
+select = [
+    "E", "W",   # pycodestyle: basic style errors
+    "F",        # pyflakes: unused imports and variables, undefined names
+    "I",        # isort: import order
+    "B",        # flake8-bugbear: likely bugs
+    "UP",       # pyupgrade: newer syntax for the target Python version
+    "SIM",      # flake8-simplify
+    "C4",       # flake8-comprehensions
+    "ASYNC",    # flake8-async: blocking calls inside async code
+    "S",        # flake8-bandit: security
+    "RUF",      # ruff-specific rules
+]
+ignore = [
+    # Hardcoded passwords: the rule looks only at names, so every constant with "token" or "password" in the name
+    # is reported (cookie names, error codes). Secrets come from environment variables through Settings
+    "S105", "S106",
+]
+
+[tool.ruff.lint.flake8-bugbear]
+# FastAPI reads Depends() and Query() in default arguments by design, they are not mutable defaults
+extend-immutable-calls = ["fastapi.Depends", "fastapi.Query"]
+
+[tool.ruff.lint.per-file-ignores]
+# assert is how pytest checks results
+"tests/**" = ["S101"]
+# conftest sets the environment variables before the app is imported
+"tests/conftest.py" = ["E402"]
+
+[tool.mypy]
+python_version = "3.12"
+files = ["app"]
+strict = true
+plugins = ["pydantic.mypy"]
+
+[tool.pydantic-mypy]
+init_forbid_extra = true
+init_typed = true
+warn_required_dynamic_aliases = true

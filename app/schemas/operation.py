@@ -1,7 +1,7 @@
 from datetime import datetime
 from decimal import Decimal
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, ValidationInfo, field_validator
 
 from app.enums import CurrencyEnum
 from app.schemas.common import Money
@@ -49,14 +49,14 @@ class TransferRequest(BaseModel):
 
     @field_validator("to_wallet_id")
     @classmethod
-    def wallets_must_be_different(cls, v: int, info) -> int:
+    def wallets_must_be_different(cls, v: int, info: ValidationInfo) -> int:
         if "from_wallet_id" in info.data and v == info.data["from_wallet_id"]:
             raise ValueError("Wallet id must be different")
         return v
 
     @field_validator("amount")
     @classmethod
-    def amount_must_be_positive(cls, v: int) -> Decimal:
+    def amount_must_be_positive(cls, v: Decimal) -> Decimal:
         if v <= 0:
             raise ValueError("Amount must be greater than 0")
         return v

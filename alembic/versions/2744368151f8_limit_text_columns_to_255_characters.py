@@ -5,26 +5,27 @@ Revises: ab5c1b262ae3
 Create Date: 2026-11-02 16:17:01.991479
 
 """
-from typing import Sequence, Union
 
-from alembic import op
+from collections.abc import Sequence
+
 import sqlalchemy as sa
 
+from alembic import op
 
 # revision identifiers, used by Alembic.
-revision: str = '2744368151f8'
-down_revision: Union[str, Sequence[str], None] = 'ab5c1b262ae3'
-branch_labels: Union[str, Sequence[str], None] = None
-depends_on: Union[str, Sequence[str], None] = None
+revision: str = "2744368151f8"
+down_revision: str | Sequence[str] | None = "ab5c1b262ae3"
+branch_labels: str | Sequence[str] | None = None
+depends_on: str | Sequence[str] | None = None
 
 
 # Autogenerate does not detect a length added to String, so these are written by hand
 COLUMNS = [
-    ('user', 'login', False),
-    ('wallet', 'name', False),
-    ('operation', 'category', True),
-    ('operation', 'subcategory', True),
-    ('operation', 'description', True),
+    ("user", "login", False),
+    ("wallet", "name", False),
+    ("operation", "category", True),
+    ("operation", "subcategory", True),
+    ("operation", "description", True),
 ]
 
 

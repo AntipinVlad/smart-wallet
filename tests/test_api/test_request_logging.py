@@ -12,14 +12,18 @@ def access_records(caplog) -> list[logging.LogRecord]:
     return [record for record in caplog.records if record.name == ACCESS_LOGGER]
 
 
-@pytest.mark.parametrize("sent_id, kept", [
-    (None, False),
-    # Usually set by nginx, so the same id is in the logs of nginx and of the app
-    ("nginx-4f2a.1", True),
-    ("x" * 65, False),
-    ("bad id with spaces", False),
-    ("id\r\nX-Injected: 1", False),
-], ids=["not_sent", "valid", "too_long", "unsafe_characters", "header_injection"])
+@pytest.mark.parametrize(
+    "sent_id, kept",
+    [
+        (None, False),
+        # Usually set by nginx, so the same id is in the logs of nginx and of the app
+        ("nginx-4f2a.1", True),
+        ("x" * 65, False),
+        ("bad id with spaces", False),
+        ("id\r\nX-Injected: 1", False),
+    ],
+    ids=["not_sent", "valid", "too_long", "unsafe_characters", "header_injection"],
+)
 def test_response_has_request_id(client, sent_id, kept):
     # Act
     response = client.get("/api/v1/users/me", headers={"X-Request-ID": sent_id} if sent_id else {})

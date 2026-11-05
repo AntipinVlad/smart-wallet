@@ -9,14 +9,17 @@ from tests.conftest import assert_error
 
 
 def add_operation(client, auth, user, endpoint: str, **payload):
-    return client.post(f"/api/v1/operations/{endpoint}", json={"wallet_name": "card", "amount": 50} | payload,
-                       headers=auth(user))
+    return client.post(
+        f"/api/v1/operations/{endpoint}", json={"wallet_name": "card", "amount": 50} | payload, headers=auth(user)
+    )
 
 
 def transfer(client, auth, user, from_wallet_id: int, to_wallet_id: int, amount: Decimal | str = "50"):
-    return client.post("/api/v1/operations/transfers",
-                       json={"from_wallet_id": from_wallet_id, "to_wallet_id": to_wallet_id, "amount": str(amount)},
-                       headers=auth(user))
+    return client.post(
+        "/api/v1/operations/transfers",
+        json={"from_wallet_id": from_wallet_id, "to_wallet_id": to_wallet_id, "amount": str(amount)},
+        headers=auth(user),
+    )
 
 
 def test_add_income(client, db_session, make_user, make_wallet, auth):
@@ -39,8 +42,9 @@ def test_add_income(client, db_session, make_user, make_wallet, auth):
     assert wallet.balance == Decimal(250)
 
 
-@pytest.mark.parametrize("amount, balance_after", [(50, Decimal(150)), (200, Decimal(0))],
-                         ids=["part_of_balance", "whole_balance"])
+@pytest.mark.parametrize(
+    "amount, balance_after", [(50, Decimal(150)), (200, Decimal(0))], ids=["part_of_balance", "whole_balance"]
+)
 def test_add_expense(client, db_session, make_user, make_wallet, auth, amount, balance_after):
     user = make_user()
     wallet = make_wallet(user, balance=Decimal(200))
@@ -68,15 +72,25 @@ def test_add_expense_not_enough_money(client, db_session, make_user, make_wallet
     assert wallet.balance == Decimal(200)
 
 
-@pytest.mark.parametrize("endpoint, payload", [
-    ("income", {"amount": 0}),
-    ("expense", {"amount": -50}),
-    ("income", {"amount": "0.001"}),
-    ("expense", {"amount": "12345678901234567.00"}),
-    ("income", {"description": "a" * 256}),
-    ("expense", {"wallet_name": " "}),
-], ids=["zero_amount", "negative_amount", "too_many_decimals", "too_many_digits", "long_description",
-        "empty_wallet_name"])
+@pytest.mark.parametrize(
+    "endpoint, payload",
+    [
+        ("income", {"amount": 0}),
+        ("expense", {"amount": -50}),
+        ("income", {"amount": "0.001"}),
+        ("expense", {"amount": "12345678901234567.00"}),
+        ("income", {"description": "a" * 256}),
+        ("expense", {"wallet_name": " "}),
+    ],
+    ids=[
+        "zero_amount",
+        "negative_amount",
+        "too_many_decimals",
+        "too_many_digits",
+        "long_description",
+        "empty_wallet_name",
+    ],
+)
 def test_operation_rejects_invalid_request(client, make_user, make_wallet, auth, endpoint, payload):
     user = make_user()
     make_wallet(user)
@@ -155,7 +169,7 @@ def test_get_operations_by_date_range(client, make_user, make_wallet, make_opera
     response = client.get(
         "/api/v1/operations",
         params={"date_from": "2026-01-10T00:00:00", "date_to": "2026-01-20T00:00:00"},
-        headers=auth(user)
+        headers=auth(user),
     )
 
     # Assert
@@ -174,10 +188,16 @@ def test_transfer_same_currency(client, db_session, make_user, make_wallet, auth
     # Assert
     assert response.status_code == 200
     outgoing, incoming = response.json()
-    assert (outgoing["wallet_id"], outgoing["subcategory"], outgoing["description"]) == \
-        (source.id, "outgoing", "Transfer to cash")
-    assert (incoming["wallet_id"], incoming["subcategory"], incoming["description"]) == \
-        (target.id, "incoming", "Transfer from card")
+    assert (outgoing["wallet_id"], outgoing["subcategory"], outgoing["description"]) == (
+        source.id,
+        "outgoing",
+        "Transfer to cash",
+    )
+    assert (incoming["wallet_id"], incoming["subcategory"], incoming["description"]) == (
+        target.id,
+        "incoming",
+        "Transfer from card",
+    )
     assert outgoing["type"] == incoming["type"] == "transfer"
     assert Decimal(outgoing["amount"]) == Decimal(incoming["amount"]) == Decimal(50)
     # Both sides of one transfer are linked, so the history can show them as one transfer
@@ -208,8 +228,9 @@ def test_transfer_converts_currency(client, db_session, make_user, make_wallet, 
     assert (source.balance, target.balance) == (Decimal(150), Decimal(2010))
 
 
-def test_transfer_exchange_rate_not_found_changes_nothing(client, db_session, make_user, make_wallet, auth,
-                                                          mock_exchange_rate):
+def test_transfer_exchange_rate_not_found_changes_nothing(
+    client, db_session, make_user, make_wallet, auth, mock_exchange_rate
+):
     mock_exchange_rate.side_effect = ExchangeRateNotFoundError(CurrencyEnum.USD, CurrencyEnum.UAH)
     user = make_user()
     source = make_wallet(user, name="dollars", balance=Decimal(200), currency=CurrencyEnum.USD)
@@ -255,8 +276,11 @@ def test_transfer_to_unavailable_wallet(client, db_session, make_user, make_wall
     assert source.balance == Decimal(200)
 
 
-@pytest.mark.parametrize("to_same_wallet, amount", [(True, "50"), (False, "-50"), (False, "0.001")],
-                         ids=["same_wallet", "negative_amount", "too_many_decimals"])
+@pytest.mark.parametrize(
+    "to_same_wallet, amount",
+    [(True, "50"), (False, "-50"), (False, "0.001")],
+    ids=["same_wallet", "negative_amount", "too_many_decimals"],
+)
 def test_transfer_rejects_invalid_request(client, make_user, make_wallet, auth, to_same_wallet, amount):
     user = make_user()
     source = make_wallet(user, name="card")

@@ -62,15 +62,24 @@ class RequestContextMiddleware:
             if not scope["path"].startswith(_NOT_LOGGED_PATH_PREFIX):
                 duration_ms = round((time.perf_counter() - started) * 1000, 1)
                 access_logger.info(
-                    "%s %s %s %.1fms", scope["method"], scope["path"], status, duration_ms,
-                    extra={"method": scope["method"], "path": scope["path"], "status": status,
-                           "duration_ms": duration_ms},
+                    "%s %s %s %.1fms",
+                    scope["method"],
+                    scope["path"],
+                    status,
+                    duration_ms,
+                    extra={
+                        "method": scope["method"],
+                        "path": scope["path"],
+                        "status": status,
+                        "duration_ms": duration_ms,
+                    },
                 )
             request_id_var.reset(token)
 
     @staticmethod
     def _request_id(scope: Scope) -> str:
-        for name, value in scope["headers"]:
+        headers: list[tuple[bytes, bytes]] = scope["headers"]
+        for name, value in headers:
             if name.decode("latin-1").lower() == REQUEST_ID_HEADER.lower():
                 candidate = value.decode("latin-1")
                 if _VALID_REQUEST_ID.fullmatch(candidate):

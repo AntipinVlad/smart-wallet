@@ -5,7 +5,7 @@ from sqlalchemy import select
 
 from app.core.security import hash_password
 from app.models import User
-from tests.conftest import assert_error, OTHER_REQUEST_SECONDS, PASSWORD, Pause
+from tests.conftest import OTHER_REQUEST_SECONDS, PASSWORD, Pause, assert_error
 
 
 def test_create_user(client, db_session):
@@ -19,11 +19,15 @@ def test_create_user(client, db_session):
     assert user.password_hash.startswith("$argon2id$")
 
 
-@pytest.mark.parametrize("payload", [
-    {"login": "user"},
-    {"login": "user", "password": "short"},
-    {"login": "a" * 128, "password": PASSWORD},
-], ids=["without_password", "short_password", "long_login"])
+@pytest.mark.parametrize(
+    "payload",
+    [
+        {"login": "user"},
+        {"login": "user", "password": "short"},
+        {"login": "a" * 128, "password": PASSWORD},
+    ],
+    ids=["without_password", "short_password", "long_login"],
+)
 def test_create_user_rejects_invalid_request(client, payload):
     # Act
     response = client.post("/api/v1/users", json=payload)
@@ -57,8 +61,7 @@ def test_get_me(client, make_user, auth):
     assert response.json() == {"id": user.id, "login": user.login}
 
 
-def test_slow_password_hashing_does_not_block_other_requests(client, make_user, auth, monkeypatch,
-                                                             run_in_background):
+def test_slow_password_hashing_does_not_block_other_requests(client, make_user, auth, monkeypatch, run_in_background):
     # Hashing a password takes tens of milliseconds of CPU. In the event loop it would stop every other request
     user = make_user()
     pause = Pause()

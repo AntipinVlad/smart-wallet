@@ -1,4 +1,5 @@
 import logging
+from collections.abc import Mapping
 from http import HTTPStatus
 from typing import Any
 
@@ -10,8 +11,8 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 from app.core.exceptions import (
     AppError,
     AuthenticationError,
-    ErrorCode,
     ConflictError,
+    ErrorCode,
     ExternalServiceError,
     ExternalServiceUnavailableError,
     NotFoundError,
@@ -39,8 +40,13 @@ def status_code_for(error_type: type[AppError]) -> int:
     raise TypeError(f"{error_type.__name__} does not belong to any error group")
 
 
-def error_response(status_code: int, code: ErrorCode, message: str, details: list[dict[str, Any]] | None = None,
-                   headers: dict[str, str] | None = None) -> JSONResponse:
+def error_response(
+    status_code: int,
+    code: ErrorCode,
+    message: str,
+    details: list[dict[str, Any]] | None = None,
+    headers: Mapping[str, str] | None = None,
+) -> JSONResponse:
     error: dict[str, Any] = {"code": code, "message": message}
     if details is not None:
         error["details"] = details
@@ -62,8 +68,7 @@ async def handle_http_exception(_: Request, error: StarletteHTTPException) -> JS
 async def handle_validation_error(_: Request, error: RequestValidationError) -> JSONResponse:
     # Only the field and the reason. Pydantic also adds the sent value, which can be a password
     details = [
-        {"field": ".".join(str(part) for part in item["loc"]), "message": item["msg"]}
-        for item in error.errors()
+        {"field": ".".join(str(part) for part in item["loc"]), "message": item["msg"]} for item in error.errors()
     ]
     return error_response(422, ErrorCode.VALIDATION_ERROR, "Request validation failed", details)
 
@@ -76,9 +81,11 @@ def unexpected_error_response(method: str, path: str, error: Exception) -> JSONR
 
 
 def register_exception_handlers(app: FastAPI) -> None:
-    app.add_exception_handler(AppError, handle_app_error)
-    app.add_exception_handler(StarletteHTTPException, handle_http_exception)
-    app.add_exception_handler(RequestValidationError, handle_validation_error)
+    # Starlette types a handler as accepting any Exception, so a handler for one exception type does not match.
+    # It is called only for the registered type
+    app.add_exception_handler(AppError, handle_app_error)  # type: ignore[arg-type]
+    app.add_exception_handler(StarletteHTTPException, handle_http_exception)  # type: ignore[arg-type]
+    app.add_exception_handler(RequestValidationError, handle_validation_error)  # type: ignore[arg-type]
     # Unhandled errors are turned into 500 by RequestContextMiddleware, see unexpected_error_response
 
 
@@ -96,8 +103,9 @@ def error_responses(*error_types: type[AppError], validation: bool = False) -> d
         codes_by_status.setdefault(status_code_for(error_type), []).append(error_type.code)
     if validation:
         codes_by_status[422] = [ErrorCode.VALIDATION_ERROR]
-    return {status_code: _documented_response(status_code, codes)
-            for status_code, codes in sorted(codes_by_status.items())}
+    return {
+        status_code: _documented_response(status_code, codes) for status_code, codes in sorted(codes_by_status.items())
+    }
 
 
 # Added to every route in main.py

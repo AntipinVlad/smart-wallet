@@ -8,7 +8,7 @@ from app.schemas.common import Money
 
 class CreateWalletRequest(BaseModel):
     name: str = Field(..., max_length=127)
-    initial_balance: Money = 0
+    initial_balance: Money = Decimal("0")
     currency: CurrencyEnum = CurrencyEnum.UAH
 
     @field_validator("initial_balance")

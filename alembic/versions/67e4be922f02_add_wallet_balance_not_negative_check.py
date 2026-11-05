@@ -5,16 +5,16 @@ Revises: f49fdade1d0e
 Create Date: 2026-11-03 14:46:53.995553
 
 """
-from typing import Sequence, Union
+
+from collections.abc import Sequence
 
 from alembic import op
 
-
 # revision identifiers, used by Alembic.
-revision: str = '67e4be922f02'
-down_revision: Union[str, Sequence[str], None] = 'f49fdade1d0e'
-branch_labels: Union[str, Sequence[str], None] = None
-depends_on: Union[str, Sequence[str], None] = None
+revision: str = "67e4be922f02"
+down_revision: str | Sequence[str] | None = "f49fdade1d0e"
+branch_labels: str | Sequence[str] | None = None
+depends_on: str | Sequence[str] | None = None
 
 
 # Written by hand: autogenerate does not detect check constraints

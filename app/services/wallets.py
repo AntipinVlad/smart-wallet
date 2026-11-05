@@ -9,14 +9,13 @@ from app.core.exceptions import WalletAlreadyExistsError
 from app.enums import CurrencyEnum
 from app.models import User
 from app.repository import wallets as wallet_repository
-from app.schemas import CreateWalletRequest, WalletResponse, TotalBalance
+from app.schemas import CreateWalletRequest, TotalBalance, WalletResponse
 from app.services import exchange_service
 
 logger = logging.getLogger(__name__)
 
 
-async def get_total_balance(db: AsyncSession, http_session: aiohttp.ClientSession,
-                            current_user: User) -> TotalBalance:
+async def get_total_balance(db: AsyncSession, http_session: aiohttp.ClientSession, current_user: User) -> TotalBalance:
     wallets = await wallet_repository.get_all_wallets(db, current_user.id)
     total_balance = Decimal(0)
 
@@ -38,15 +37,16 @@ async def create_wallet(db: AsyncSession, current_user: User, wallet: CreateWall
         raise WalletAlreadyExistsError(wallet.name)
 
     try:
-        wallet = await wallet_repository.create_wallet(db, user_id, wallet.name, wallet.initial_balance,
-                                                       wallet.currency)
+        created = await wallet_repository.create_wallet(
+            db, user_id, wallet.name, wallet.initial_balance, wallet.currency
+        )
         await db.commit()
     except IntegrityError as e:
         await db.rollback()
         logger.warning("Wallet '%s' for user %s was created by a concurrent request", wallet.name, user_id)
         raise WalletAlreadyExistsError(wallet.name) from e
 
-    return WalletResponse.model_validate(wallet)
+    return WalletResponse.model_validate(created)
 
 
 async def get_all_wallets(db: AsyncSession, current_user: User) -> list[WalletResponse]:

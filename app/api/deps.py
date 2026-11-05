@@ -7,6 +7,7 @@ import jwt
 from fastapi import Depends, Request
 from fastapi.security import APIKeyCookie
 from sqlalchemy.ext.asyncio import AsyncSession
+
 from app.core.cookies import ACCESS_TOKEN_COOKIE
 from app.core.exceptions import NotAuthenticatedError
 from app.core.security import decode_access_token
@@ -31,11 +32,13 @@ async def get_db() -> AsyncIterator[AsyncSession]:
 
 
 def get_http_session(request: Request) -> aiohttp.ClientSession:
-    return request.state.http_session
+    http_session: aiohttp.ClientSession = request.state.http_session
+    return http_session
 
 
-async def get_current_user(access_token: str | None = Depends(access_token_cookie),
-                           db: AsyncSession = Depends(get_db)) -> User:
+async def get_current_user(
+    access_token: str | None = Depends(access_token_cookie), db: AsyncSession = Depends(get_db)
+) -> User:
     if access_token is None:
         raise NotAuthenticatedError()
 

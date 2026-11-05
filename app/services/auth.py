@@ -1,5 +1,5 @@
 import logging
-from datetime import datetime, timedelta, UTC
+from datetime import UTC, datetime, timedelta
 
 from fastapi.concurrency import run_in_threadpool
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -70,7 +70,7 @@ async def _issue_tokens(db: AsyncSession, user_id: int) -> TokenPair:
         db,
         user_id,
         hash_refresh_token(refresh_token),
-        datetime.now(UTC) + timedelta(days=settings.refresh_token_expire_days)
+        datetime.now(UTC) + timedelta(days=settings.refresh_token_expire_days),
     )
     await db.commit()
 

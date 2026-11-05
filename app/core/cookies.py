@@ -1,4 +1,4 @@
-from typing import Annotated
+from typing import Annotated, Literal, TypedDict
 
 from fastapi import Cookie, Response
 
@@ -11,9 +11,16 @@ ACCESS_TOKEN_COOKIE_PATH = "/"
 # The browser sends the refresh token only to the auth endpoints, not with every API request
 REFRESH_TOKEN_COOKIE_PATH = "/api/v1/auth"
 
+
 # HttpOnly hides the tokens from JavaScript, Secure sends them only over https,
 # SameSite=strict keeps the browser from attaching them to requests made by other sites
-AUTH_COOKIE_FLAGS = {"httponly": True, "secure": True, "samesite": "strict"}
+class CookieFlags(TypedDict):
+    httponly: bool
+    secure: bool
+    samesite: Literal["lax", "strict", "none"]
+
+
+AUTH_COOKIE_FLAGS: CookieFlags = {"httponly": True, "secure": True, "samesite": "strict"}
 
 RefreshTokenCookie = Annotated[str | None, Cookie(alias=REFRESH_TOKEN_COOKIE, max_length=255)]
 

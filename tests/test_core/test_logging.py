@@ -30,7 +30,10 @@ def test_json_formatter_writes_one_json_object_per_record(request_id):
 
     # Assert
     assert {key: data[key] for key in ("level", "logger", "message", "request_id", "user_id")} == {
-        "level": "INFO", "logger": "app.services.wallets", "message": "Wallet created", "request_id": "req-123",
+        "level": "INFO",
+        "logger": "app.services.wallets",
+        "message": "Wallet created",
+        "request_id": "req-123",
         "user_id": 7,
     }
     assert data["timestamp"].endswith("+00:00")
@@ -41,8 +44,9 @@ def test_json_formatter_adds_exception_traceback():
     try:
         raise RuntimeError("database is down")
     except RuntimeError:
-        record = logging.getLogger("app").makeRecord("app", logging.ERROR, __file__, 10, "Failed", None,
-                                                     exc_info=sys.exc_info())
+        record = logging.getLogger("app").makeRecord(
+            "app", logging.ERROR, __file__, 10, "Failed", None, exc_info=sys.exc_info()
+        )
 
     # Act
     data = json.loads(JsonFormatter().format(record))
