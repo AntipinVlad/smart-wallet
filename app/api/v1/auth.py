@@ -17,10 +17,12 @@ router = APIRouter()
 async def limit_login_attempts(request: Request, payload: LoginRequest, redis: Redis = Depends(get_redis)) -> None:
     # Behind nginx this is the client address only with uvicorn --proxy-headers
     ip = request.client.host if request.client else "unknown"
-    window = settings.login_rate_limit_window_seconds
-    await rate_limit.hit(redis, "login_ip", ip, settings.login_rate_limit_per_ip, window)
-    # Not per login alone: then anyone could lock another user out
-    await rate_limit.hit(redis, "login_ip_login", f"{ip}:{payload.login}", settings.login_rate_limit_per_login, window)
+    limits = [
+        rate_limit.Limit("login_ip", ip, settings.login_rate_limit_per_ip),
+        # Not per login alone: then anyone could lock another user out
+        rate_limit.Limit("login_ip_login", f"{ip}:{payload.login}", settings.login_rate_limit_per_login),
+    ]
+    await rate_limit.hit(redis, "login", limits, settings.login_rate_limit_window_seconds)
 
 
 @router.post(
