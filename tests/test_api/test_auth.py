@@ -6,7 +6,7 @@ from app.core.config import settings
 from app.core.cookies import ACCESS_TOKEN_COOKIE, REFRESH_TOKEN_COOKIE
 from app.core.security import create_access_token, hash_refresh_token, verify_password
 from app.models import RefreshToken, User
-from tests.conftest import PASSWORD, Pause
+from tests.conftest import assert_error, PASSWORD, Pause
 
 REFRESH_URL = "/api/v1/auth/refresh"
 LOGOUT_URL = "/api/v1/auth/logout"
@@ -96,7 +96,7 @@ def test_bearer_header_is_not_accepted(client, make_user):
     response = client.get("/api/v1/users/me", headers={"Authorization": f"Bearer {create_access_token(user.id)}"})
 
     # Assert
-    assert response.status_code == 401
+    assert_error(response, 401, "NOT_AUTHENTICATED")
 
 
 def test_login_wrong_password(client, make_user):
@@ -106,7 +106,7 @@ def test_login_wrong_password(client, make_user):
     response = login(client, password="wrong-password")
 
     # Assert
-    assert response.status_code == 401
+    assert_error(response, 401, "INVALID_CREDENTIALS")
     assert "set-cookie" not in response.headers
 
 
@@ -118,7 +118,7 @@ def test_login_unknown_user_gets_same_error_as_wrong_password(client, make_user)
     wrong_password = login(client, password="wrong-password")
 
     # Assert
-    assert unknown.status_code == 401
+    assert_error(unknown, 401, "INVALID_CREDENTIALS")
     assert unknown.json() == wrong_password.json()
 
 
@@ -142,7 +142,7 @@ def test_refresh_without_cookie(client):
     response = client.post(REFRESH_URL)
 
     # Assert
-    assert response.status_code == 401
+    assert_error(response, 401, "INVALID_REFRESH_TOKEN")
 
 
 def test_refresh_token_works_only_once(client, make_user):
@@ -154,7 +154,7 @@ def test_refresh_token_works_only_once(client, make_user):
     response = refresh(client, token)
 
     # Assert
-    assert response.status_code == 401
+    assert_error(response, 401, "INVALID_REFRESH_TOKEN")
 
 
 def test_reusing_refresh_token_revokes_all_user_sessions(client, make_user):
@@ -167,8 +167,8 @@ def test_reusing_refresh_token_revokes_all_user_sessions(client, make_user):
     refresh(client, stolen)
 
     # Assert
-    assert refresh(client, current).status_code == 401
-    assert refresh(client, other_session).status_code == 401
+    assert_error(refresh(client, current), 401, "INVALID_REFRESH_TOKEN")
+    assert_error(refresh(client, other_session), 401, "INVALID_REFRESH_TOKEN")
 
 
 def test_refresh_unknown_token(client):
@@ -176,7 +176,7 @@ def test_refresh_unknown_token(client):
     response = refresh(client, "not_exist")
 
     # Assert
-    assert response.status_code == 401
+    assert_error(response, 401, "INVALID_REFRESH_TOKEN")
 
 
 def test_refresh_expired_token(client, db_session, make_user):
@@ -190,7 +190,7 @@ def test_refresh_expired_token(client, db_session, make_user):
     response = refresh(client, token)
 
     # Assert
-    assert response.status_code == 401
+    assert_error(response, 401, "INVALID_REFRESH_TOKEN")
 
 
 def test_refresh_token_is_stored_hashed(client, db_session, make_user):
@@ -214,7 +214,7 @@ def test_logout_revokes_refresh_token(client, make_user):
 
     # Assert
     assert response.status_code == 204
-    assert refresh(client, token).status_code == 401
+    assert_error(refresh(client, token), 401, "INVALID_REFRESH_TOKEN")
 
 
 def test_logout_deletes_cookies(client, make_user):
@@ -227,7 +227,7 @@ def test_logout_deletes_cookies(client, make_user):
     # Assert
     assert "max-age=0" in set_cookie_header(response, ACCESS_TOKEN_COOKIE).lower()
     assert "max-age=0" in set_cookie_header(response, REFRESH_TOKEN_COOKIE).lower()
-    assert client.get("/api/v1/users/me").status_code == 401
+    assert_error(client.get("/api/v1/users/me"), 401, "NOT_AUTHENTICATED")
 
 
 def test_logout_keeps_other_sessions(client, make_user):
@@ -266,7 +266,7 @@ def test_access_token_expired(client, make_user):
     response = client.get("/api/v1/users/me", headers=with_access_token(encode_access_token(payload)))
 
     # Assert
-    assert response.status_code == 401
+    assert_error(response, 401, "NOT_AUTHENTICATED")
 
 
 def test_access_token_signed_with_other_key(client, make_user):
@@ -277,7 +277,7 @@ def test_access_token_signed_with_other_key(client, make_user):
     response = client.get("/api/v1/users/me", headers=with_access_token(token))
 
     # Assert
-    assert response.status_code == 401
+    assert_error(response, 401, "NOT_AUTHENTICATED")
 
 
 def test_access_token_with_wrong_type(client, make_user):
@@ -288,7 +288,7 @@ def test_access_token_with_wrong_type(client, make_user):
     response = client.get("/api/v1/users/me", headers=with_access_token(encode_access_token(payload)))
 
     # Assert
-    assert response.status_code == 401
+    assert_error(response, 401, "NOT_AUTHENTICATED")
 
 
 def test_access_token_without_expiration(client, make_user):
@@ -300,7 +300,7 @@ def test_access_token_without_expiration(client, make_user):
     response = client.get("/api/v1/users/me", headers=with_access_token(encode_access_token(payload)))
 
     # Assert
-    assert response.status_code == 401
+    assert_error(response, 401, "NOT_AUTHENTICATED")
 
 
 def test_access_token_of_deleted_user(client, db_session, make_user):
@@ -313,7 +313,7 @@ def test_access_token_of_deleted_user(client, db_session, make_user):
     response = client.get("/api/v1/users/me", headers=with_access_token(token))
 
     # Assert
-    assert response.status_code == 401
+    assert_error(response, 401, "NOT_AUTHENTICATED")
 
 
 def test_login_cannot_be_used_as_access_token(client, make_user):
@@ -323,7 +323,7 @@ def test_login_cannot_be_used_as_access_token(client, make_user):
     response = client.get("/api/v1/users/me", headers=with_access_token(user.login))
 
     # Assert
-    assert response.status_code == 401
+    assert_error(response, 401, "NOT_AUTHENTICATED")
 
 
 def test_slow_password_check_does_not_block_other_requests(client, make_user, auth, monkeypatch, run_in_background):

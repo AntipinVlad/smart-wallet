@@ -1,11 +1,11 @@
 import logging
 from datetime import datetime, timedelta, UTC
 
-from fastapi import HTTPException
 from fastapi.concurrency import run_in_threadpool
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
+from app.core.exceptions import InvalidCredentialsError, InvalidRefreshTokenError
 from app.core.security import (
     DUMMY_PASSWORD_HASH,
     create_access_token,
@@ -29,7 +29,7 @@ async def login(db: AsyncSession, user_login: str, password: str) -> TokenPair:
 
     if not user or not is_password_valid:
         logger.warning("Failed login attempt for '%s'", user_login)
-        raise HTTPException(status_code=401, detail="Invalid login or password")
+        raise InvalidCredentialsError()
 
     logger.info("User %s logged in", user.id)
     return await _issue_tokens(db, user.id)
@@ -39,7 +39,7 @@ async def refresh_tokens(db: AsyncSession, refresh_token: str) -> TokenPair:
     token_hash = hash_refresh_token(refresh_token)
     stored_token = await refresh_token_repository.get_refresh_token_for_update(db, token_hash)
     if not stored_token:
-        raise HTTPException(status_code=401, detail="Invalid refresh token")
+        raise InvalidRefreshTokenError()
 
     now = datetime.now(UTC)
     if stored_token.revoked_at:
@@ -47,10 +47,10 @@ async def refresh_tokens(db: AsyncSession, refresh_token: str) -> TokenPair:
         logger.warning("Revoked refresh token reused, ending all sessions of user %s", stored_token.user_id)
         await refresh_token_repository.revoke_all_user_tokens(db, stored_token.user_id, now)
         await db.commit()
-        raise HTTPException(status_code=401, detail="Invalid refresh token")
+        raise InvalidRefreshTokenError()
 
     if stored_token.expires_at <= now:
-        raise HTTPException(status_code=401, detail="Invalid refresh token")
+        raise InvalidRefreshTokenError()
 
     stored_token.revoked_at = now
     return await _issue_tokens(db, stored_token.user_id)

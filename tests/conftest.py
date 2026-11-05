@@ -14,6 +14,7 @@ DATABASE_URL = os.environ.get("TEST_DATABASE_URL", "postgresql+psycopg://wallet@
 os.environ["DATABASE_URL"] = DATABASE_URL
 os.environ["JWT_SECRET_KEY"] = "test-only-secret-key-0123456789-0123456789"
 
+import httpx
 import pytest
 from alembic import command
 from alembic.config import Config
@@ -22,6 +23,7 @@ from sqlalchemy.orm import Session, sessionmaker
 from fastapi.testclient import TestClient
 
 from app.core.cookies import ACCESS_TOKEN_COOKIE
+from app.core.exceptions import ErrorCode
 from app.core.security import create_access_token, hash_password
 from app.database import Base
 from app.enum import CurrencyEnum, OperationType
@@ -50,6 +52,16 @@ class Pause:
             return func(*args, **kwargs)
 
         return paused
+
+
+def assert_error(response: httpx.Response, status_code: int, code: str) -> dict[str, Any]:
+    """Checks the common error format of the API and returns the error object."""
+    assert response.status_code == status_code, response.text
+    error = response.json()["error"]
+    assert error["code"] == code
+    assert error["code"] in set(ErrorCode), "every code the API returns must be in ErrorCode"
+    assert error["message"]
+    return error
 
 
 @pytest.fixture(scope="session")

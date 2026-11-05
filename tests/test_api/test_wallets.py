@@ -2,9 +2,10 @@ from decimal import Decimal
 from unittest.mock import AsyncMock
 
 import pytest
-from fastapi import HTTPException
 
+from app.core.exceptions import ExchangeRateNotFoundError
 from app.enum import CurrencyEnum
+from tests.conftest import assert_error
 
 
 def test_create_wallet_success(client, make_user, auth):
@@ -55,7 +56,7 @@ def test_create_wallet_already_exists(client, make_user, make_wallet, auth):
     response = client.post("/api/v1/wallets", json={"name": "card"}, headers=auth(user))
 
     # Assert
-    assert response.status_code == 400
+    assert_error(response, 409, "WALLET_ALREADY_EXISTS")
 
 
 def test_create_wallet_name_taken_by_concurrent_request(client, make_user, make_wallet, auth, monkeypatch):
@@ -67,7 +68,7 @@ def test_create_wallet_name_taken_by_concurrent_request(client, make_user, make_
     response = client.post("/api/v1/wallets", json={"name": "card"}, headers=auth(user))
 
     # Assert
-    assert response.status_code == 400
+    assert_error(response, 409, "WALLET_ALREADY_EXISTS")
 
 
 @pytest.mark.parametrize("initial_balance", ["10.001", "12345678901234567.00"])
@@ -82,7 +83,7 @@ def test_create_wallet_balance_out_of_precision(client, make_user, auth, initial
     )
 
     # Assert
-    assert response.status_code == 422
+    assert_error(response, 422, "VALIDATION_ERROR")
 
 
 def test_create_wallet_same_name_for_different_users(client, make_user, make_wallet, auth):
@@ -107,7 +108,7 @@ def test_create_wallet_negative_balance(client, make_user, auth):
     )
 
     # Assert
-    assert response.status_code == 422
+    assert_error(response, 422, "VALIDATION_ERROR")
 
 
 def test_create_wallet_empty_name(client, make_user, auth):
@@ -117,7 +118,7 @@ def test_create_wallet_empty_name(client, make_user, auth):
     response = client.post("/api/v1/wallets", json={"name": " "}, headers=auth(user))
 
     # Assert
-    assert response.status_code == 422
+    assert_error(response, 422, "VALIDATION_ERROR")
 
 
 def test_create_wallet_unknown_currency(client, make_user, auth):
@@ -131,7 +132,7 @@ def test_create_wallet_unknown_currency(client, make_user, auth):
     )
 
     # Assert
-    assert response.status_code == 422
+    assert_error(response, 422, "VALIDATION_ERROR")
 
 
 def test_create_wallet_not_authorized(client):
@@ -143,7 +144,7 @@ def test_create_wallet_not_authorized(client):
     )
 
     # Assert
-    assert response.status_code == 401
+    assert_error(response, 401, "NOT_AUTHENTICATED")
 
 
 def test_get_wallets_returns_only_own_wallets(client, make_user, make_wallet, auth):
@@ -211,7 +212,7 @@ def test_get_balance_converts_foreign_currency_to_uah(client, make_user, make_wa
 
 
 def test_get_balance_exchange_rate_not_found(client, make_user, make_wallet, auth, mock_exchange_rate):
-    mock_exchange_rate.side_effect = HTTPException(status_code=404, detail="Exchange rate not found")
+    mock_exchange_rate.side_effect = ExchangeRateNotFoundError(CurrencyEnum.USD, CurrencyEnum.UAH)
     user = make_user()
     make_wallet(user, currency=CurrencyEnum.USD)
 
@@ -219,7 +220,7 @@ def test_get_balance_exchange_rate_not_found(client, make_user, make_wallet, aut
     response = client.get("/api/v1/balance", headers=auth(user))
 
     # Assert
-    assert response.status_code == 404
+    assert_error(response, 502, "EXCHANGE_RATE_NOT_FOUND")
 
 
 def test_get_balance_ignores_other_users_wallets(client, make_user, make_wallet, auth):
@@ -239,4 +240,4 @@ def test_get_balance_not_authorized(client):
     response = client.get("/api/v1/balance", headers={"Cookie": "access_token=not_exist"})
 
     # Assert
-    assert response.status_code == 401
+    assert_error(response, 401, "NOT_AUTHENTICATED")

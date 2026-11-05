@@ -2,10 +2,10 @@ import logging
 from decimal import Decimal
 
 import aiohttp
-from fastapi import HTTPException
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.exceptions import WalletAlreadyExistsError
 from app.enum import CurrencyEnum
 from app.models import User
 from app.repository import wallets as wallet_repository
@@ -35,7 +35,7 @@ async def create_wallet(db: AsyncSession, current_user: User, wallet: CreateWall
     # would need a new query, which async SQLAlchemy does not run implicitly, so the id is kept here
     user_id = current_user.id
     if await wallet_repository.is_wallet_exist(db, user_id, wallet.name):
-        raise HTTPException(status_code=400, detail=f"Wallet '{wallet.name}' already exists")
+        raise WalletAlreadyExistsError(wallet.name)
 
     try:
         wallet = await wallet_repository.create_wallet(db, user_id, wallet.name, wallet.initial_balance,
@@ -44,7 +44,7 @@ async def create_wallet(db: AsyncSession, current_user: User, wallet: CreateWall
     except IntegrityError as e:
         await db.rollback()
         logger.warning("Wallet '%s' for user %s was created by a concurrent request", wallet.name, user_id)
-        raise HTTPException(status_code=400, detail=f"Wallet '{wallet.name}' already exists") from e
+        raise WalletAlreadyExistsError(wallet.name) from e
 
     return WalletResponse.model_validate(wallet)
 

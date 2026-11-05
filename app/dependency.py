@@ -4,10 +4,11 @@ from typing import TypedDict
 
 import aiohttp
 import jwt
-from fastapi import Depends, HTTPException, Request
+from fastapi import Depends, Request
 from fastapi.security import APIKeyCookie
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.cookies import ACCESS_TOKEN_COOKIE
+from app.core.exceptions import NotAuthenticatedError
 from app.core.security import decode_access_token
 from app.database import SessionLocal
 from app.models import User
@@ -36,17 +37,17 @@ def get_http_session(request: Request) -> aiohttp.ClientSession:
 async def get_current_user(access_token: str | None = Depends(access_token_cookie),
                            db: AsyncSession = Depends(get_db)) -> User:
     if access_token is None:
-        raise HTTPException(status_code=401, detail="Unauthorized")
+        raise NotAuthenticatedError()
 
     try:
         user_id = decode_access_token(access_token)
     except (jwt.InvalidTokenError, ValueError) as e:
         logger.info("Rejected access token: %s", e)
-        raise HTTPException(status_code=401, detail="Unauthorized") from e
+        raise NotAuthenticatedError() from e
 
     user = await users_repository.get_user_by_id(db, user_id)
 
     if not user:
-        raise HTTPException(status_code=401, detail="Unauthorized")
+        raise NotAuthenticatedError()
 
     return user

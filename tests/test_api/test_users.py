@@ -4,7 +4,7 @@ from sqlalchemy import select
 
 from app.core.security import hash_password
 from app.models import User
-from tests.conftest import PASSWORD, Pause
+from tests.conftest import assert_error, PASSWORD, Pause
 
 # A request that does not wait for anything answers well within this time
 OTHER_REQUEST_SECONDS = 2
@@ -36,7 +36,7 @@ def test_create_user_without_password(client):
     response = client.post("/api/v1/users", json={"login": "user"})
 
     # Assert
-    assert response.status_code == 422
+    assert_error(response, 422, "VALIDATION_ERROR")
 
 
 def test_create_user_short_password(client):
@@ -44,7 +44,7 @@ def test_create_user_short_password(client):
     response = client.post("/api/v1/users", json={"login": "user", "password": "short"})
 
     # Assert
-    assert response.status_code == 422
+    assert_error(response, 422, "VALIDATION_ERROR")
 
 
 def test_create_user_already_exists(client, make_user):
@@ -54,7 +54,7 @@ def test_create_user_already_exists(client, make_user):
     response = client.post("/api/v1/users", json={"login": "user", "password": PASSWORD})
 
     # Assert
-    assert response.status_code == 400
+    assert_error(response, 409, "USER_ALREADY_EXISTS")
 
 
 def test_create_user_login_taken_by_concurrent_request(client, make_user, monkeypatch):
@@ -65,7 +65,7 @@ def test_create_user_login_taken_by_concurrent_request(client, make_user, monkey
     response = client.post("/api/v1/users", json={"login": "user", "password": PASSWORD})
 
     # Assert
-    assert response.status_code == 400
+    assert_error(response, 409, "USER_ALREADY_EXISTS")
 
 
 def test_create_user_login_too_long(client):
@@ -73,7 +73,7 @@ def test_create_user_login_too_long(client):
     response = client.post("/api/v1/users", json={"login": "a" * 128, "password": PASSWORD})
 
     # Assert
-    assert response.status_code == 422
+    assert_error(response, 422, "VALIDATION_ERROR")
 
 
 def test_get_me_success(client, make_user, auth):
@@ -92,7 +92,7 @@ def test_get_me_unknown_token(client):
     response = client.get("/api/v1/users/me", headers={"Cookie": "access_token=not_exist"})
 
     # Assert
-    assert response.status_code == 401
+    assert_error(response, 401, "NOT_AUTHENTICATED")
 
 
 def test_get_me_without_token(client):
@@ -100,7 +100,7 @@ def test_get_me_without_token(client):
     response = client.get("/api/v1/users/me")
 
     # Assert
-    assert response.status_code == 401
+    assert_error(response, 401, "NOT_AUTHENTICATED")
 
 
 def test_slow_password_hashing_does_not_block_other_requests(client, make_user, auth, monkeypatch,
