@@ -1,3 +1,5 @@
+name: smart-wallet
+
 services:
   db:
     image: postgres:17-alpine

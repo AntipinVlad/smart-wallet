@@ -1,3 +1,6 @@
+import tomllib
+from pathlib import Path
+
 import pytest
 
 from app.core.config import settings
@@ -20,3 +23,14 @@ async def test_lifespan_opens_shared_http_session_and_closes_it_on_shutdown():
 
     # Assert
     assert http_session.closed
+
+
+def test_openapi_shows_name_and_version_from_pyproject():
+    project = tomllib.loads((Path(__file__).parent.parent / "pyproject.toml").read_text(encoding="utf-8"))["project"]
+
+    # Act
+    info = app.openapi()["info"]
+
+    # Assert
+    assert (info["title"], info["version"]) == ("Smart Wallet", project["version"])
+    assert project["name"] == "smart-wallet"
