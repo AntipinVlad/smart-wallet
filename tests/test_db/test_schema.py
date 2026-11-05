@@ -1,10 +1,10 @@
 from decimal import Decimal
 
 import pytest
-from alembic import command
 from sqlalchemy import inspect
 from sqlalchemy.exc import IntegrityError
 
+from alembic import command
 from tests.conftest import sync_engine
 
 
@@ -36,11 +36,7 @@ def test_balance_keeps_exact_decimal_value(client, db_session, make_user, make_w
     wallet = make_wallet(user, balance=Decimal("0.1"))
 
     # Act
-    client.post(
-        "/api/v1/operations/income",
-        json={"wallet_name": "card", "amount": "0.2"},
-        headers=auth(user)
-    )
+    client.post("/api/v1/operations/income", json={"wallet_name": "card", "amount": "0.2"}, headers=auth(user))
 
     # Assert
     db_session.refresh(wallet)

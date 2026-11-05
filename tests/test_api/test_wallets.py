@@ -7,11 +7,15 @@ from app.enums import CurrencyEnum
 from tests.conftest import assert_error
 
 
-@pytest.mark.parametrize("payload, expected", [
-    ({"name": "card", "initial_balance": 100, "currency": "usd"}, ("card", Decimal(100), "usd")),
-    ({"name": "card"}, ("card", Decimal(0), "uah")),
-    ({"name": "  card  "}, ("card", Decimal(0), "uah")),
-], ids=["all_fields", "default_values", "name_is_trimmed"])
+@pytest.mark.parametrize(
+    "payload, expected",
+    [
+        ({"name": "card", "initial_balance": 100, "currency": "usd"}, ("card", Decimal(100), "usd")),
+        ({"name": "card"}, ("card", Decimal(0), "uah")),
+        ({"name": "  card  "}, ("card", Decimal(0), "uah")),
+    ],
+    ids=["all_fields", "default_values", "name_is_trimmed"],
+)
 def test_create_wallet(client, make_user, auth, payload, expected):
     user = make_user()
 
@@ -24,13 +28,17 @@ def test_create_wallet(client, make_user, auth, payload, expected):
     assert (wallet["name"], Decimal(wallet["balance"]), wallet["currency"]) == expected
 
 
-@pytest.mark.parametrize("payload", [
-    {"name": "card", "initial_balance": "10.001"},
-    {"name": "card", "initial_balance": "12345678901234567.00"},
-    {"name": "card", "initial_balance": -1},
-    {"name": " "},
-    {"name": "card", "currency": "gbp"},
-], ids=["too_many_decimals", "too_many_digits", "negative_balance", "empty_name", "unknown_currency"])
+@pytest.mark.parametrize(
+    "payload",
+    [
+        {"name": "card", "initial_balance": "10.001"},
+        {"name": "card", "initial_balance": "12345678901234567.00"},
+        {"name": "card", "initial_balance": -1},
+        {"name": " "},
+        {"name": "card", "currency": "gbp"},
+    ],
+    ids=["too_many_decimals", "too_many_digits", "negative_balance", "empty_name", "unknown_currency"],
+)
 def test_create_wallet_rejects_invalid_request(client, make_user, auth, payload):
     user = make_user()
 
@@ -81,8 +89,9 @@ def test_get_wallets_returns_only_own_wallets(client, make_user, make_wallet, au
     assert {wallet["name"] for wallet in response.json()} == {"card", "cash"}
 
 
-def test_get_balance_sums_own_uah_wallets_without_exchange_rate(client, make_user, make_wallet, auth,
-                                                                mock_exchange_rate):
+def test_get_balance_sums_own_uah_wallets_without_exchange_rate(
+    client, make_user, make_wallet, auth, mock_exchange_rate
+):
     user = make_user(login="owner")
     make_wallet(user, name="card", balance=Decimal(100))
     make_wallet(user, name="cash", balance=Decimal(50))

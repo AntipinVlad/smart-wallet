@@ -8,9 +8,11 @@ ERROR_SCHEMA = {"$ref": "#/components/schemas/ErrorResponse"}
 
 
 def operations() -> dict[str, dict[str, Any]]:
-    return {f"{method.upper()} {path}": operation
-            for path, path_item in app.openapi()["paths"].items()
-            for method, operation in path_item.items()}
+    return {
+        f"{method.upper()} {path}": operation
+        for path, path_item in app.openapi()["paths"].items()
+        for method, operation in path_item.items()
+    }
 
 
 def documented_codes(operation: dict[str, Any], status_code: int) -> set[str]:
@@ -58,8 +60,9 @@ def test_route_errors_are_grouped_by_status():
     operation = operations()["POST /api/v1/operations/transfers"]
 
     # Act
-    codes_by_status = {int(status): documented_codes(operation, int(status)) for status in operation["responses"]
-                       if int(status) >= 400}
+    codes_by_status = {
+        int(status): documented_codes(operation, int(status)) for status in operation["responses"] if int(status) >= 400
+    }
 
     # Assert
     assert codes_by_status == {

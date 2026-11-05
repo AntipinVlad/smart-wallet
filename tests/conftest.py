@@ -1,11 +1,12 @@
 import asyncio
 import os
 import threading
+from collections.abc import Callable, Generator
 from concurrent.futures import Future, ThreadPoolExecutor
 from datetime import datetime
 from decimal import Decimal
 from pathlib import Path
-from typing import Any, Callable, Generator
+from typing import Any
 from unittest.mock import AsyncMock
 
 DATABASE_URL = os.environ.get("TEST_DATABASE_URL", "postgresql+psycopg://wallet@127.0.0.1:5433/finance_test")
@@ -17,19 +18,19 @@ os.environ["JWT_SECRET_KEY"] = "test-only-secret-key-0123456789-0123456789"
 # The HTTP client behind starlette's TestClient: its responses are httpx2.Response
 import httpx2
 import pytest
-from alembic import command
 from alembic.config import Config
+from fastapi.testclient import TestClient
 from sqlalchemy import create_engine, text
 from sqlalchemy.orm import Session, sessionmaker
-from fastapi.testclient import TestClient
 
+from alembic import command
 from app.core.cookies import ACCESS_TOKEN_COOKIE
 from app.core.exceptions import ErrorCode
 from app.core.security import create_access_token, hash_password
 from app.database import Base
 from app.enums import CurrencyEnum, OperationType
-from app.models import Operation, User, Wallet
 from app.main import app
+from app.models import Operation, User, Wallet
 
 PASSWORD = "correct-password"
 # A request that does not wait for anything answers well within this time
@@ -95,8 +96,9 @@ def client():
     # https, because the auth cookies are Secure and are never sent over plain http.
     # "with" keeps one event loop for the whole test, like uvicorn does, so a blocked loop shows up in tests.
     # SelectorEventLoop, because async psycopg does not work with the Windows default ProactorEventLoop.
-    with TestClient(app, base_url="https://testserver",
-                    backend_options={"loop_factory": asyncio.SelectorEventLoop}) as test_client:
+    with TestClient(
+        app, base_url="https://testserver", backend_options={"loop_factory": asyncio.SelectorEventLoop}
+    ) as test_client:
         yield test_client
 
 
@@ -128,8 +130,9 @@ def make_user(db_session) -> Callable[..., User]:
 
 @pytest.fixture()
 def make_wallet(db_session) -> Callable[..., Wallet]:
-    def _make_wallet(user: User, name: str = "card", balance: Decimal = Decimal(200),
-                     currency: CurrencyEnum = CurrencyEnum.UAH) -> Wallet:
+    def _make_wallet(
+        user: User, name: str = "card", balance: Decimal = Decimal(200), currency: CurrencyEnum = CurrencyEnum.UAH
+    ) -> Wallet:
         wallet = Wallet(name=name, balance=balance, user_id=user.id, currency=currency)
         db_session.add(wallet)
         db_session.commit()
@@ -140,10 +143,16 @@ def make_wallet(db_session) -> Callable[..., Wallet]:
 
 @pytest.fixture()
 def make_operation(db_session) -> Callable[..., Operation]:
-    def _make_operation(wallet: Wallet, amount: Decimal = Decimal(50),
-                        created_at: datetime = datetime(2026, 1, 15)) -> Operation:
-        operation = Operation(wallet_id=wallet.id, type=OperationType.EXPENSE, amount=amount,
-                              currency=wallet.currency, created_at=created_at)
+    def _make_operation(
+        wallet: Wallet, amount: Decimal = Decimal(50), created_at: datetime = datetime(2026, 1, 15)
+    ) -> Operation:
+        operation = Operation(
+            wallet_id=wallet.id,
+            type=OperationType.EXPENSE,
+            amount=amount,
+            currency=wallet.currency,
+            created_at=created_at,
+        )
         db_session.add(operation)
         db_session.commit()
         return operation

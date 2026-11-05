@@ -1,4 +1,4 @@
-from datetime import datetime, timedelta, UTC
+from datetime import UTC, datetime, timedelta
 
 import jwt
 import pytest
@@ -9,7 +9,7 @@ from app.core.cookies import ACCESS_TOKEN_COOKIE, REFRESH_TOKEN_COOKIE
 from app.core.security import create_access_token, hash_refresh_token, verify_password
 from app.main import app
 from app.models import RefreshToken, User
-from tests.conftest import assert_error, OTHER_REQUEST_SECONDS, PASSWORD, Pause
+from tests.conftest import OTHER_REQUEST_SECONDS, PASSWORD, Pause, assert_error
 
 REFRESH_URL = "/api/v1/auth/refresh"
 LOGOUT_URL = "/api/v1/auth/logout"
@@ -43,15 +43,19 @@ def set_cookie_header(response, name: str) -> str:
 
 def access_token(user: User, key: str = settings.jwt_secret_key, **claims) -> str:
     payload = {"sub": str(user.id), "type": "access", "exp": datetime.now(UTC) + timedelta(minutes=5)} | claims
-    return jwt.encode({name: value for name, value in payload.items() if value is not None}, key,
-                      algorithm=settings.jwt_algorithm)
+    return jwt.encode(
+        {name: value for name, value in payload.items() if value is not None}, key, algorithm=settings.jwt_algorithm
+    )
 
 
 def protected_routes() -> list[tuple[str, str]]:
     # Taken from the app itself, so a new protected route is checked without changing this test
-    return [(method.upper(), path)
-            for path, path_item in app.openapi()["paths"].items()
-            for method, operation in path_item.items() if "security" in operation]
+    return [
+        (method.upper(), path)
+        for path, path_item in app.openapi()["paths"].items()
+        for method, operation in path_item.items()
+        if "security" in operation
+    ]
 
 
 @pytest.mark.parametrize("method, path", protected_routes())
@@ -63,15 +67,25 @@ def test_protected_route_requires_access_token(client, method, path):
     assert_error(response, 401, "NOT_AUTHENTICATED")
 
 
-@pytest.mark.parametrize("headers", [
-    lambda user: with_access_token(access_token(user, exp=datetime.now(UTC) - timedelta(seconds=1))),
-    lambda user: with_access_token(access_token(user, key="other-secret-key-0123456789-0123456789")),
-    lambda user: with_access_token(access_token(user, type="refresh")),
-    lambda user: with_access_token(access_token(user, exp=None)),
-    lambda user: with_access_token(user.login),
-    lambda user: {"Authorization": f"Bearer {create_access_token(user.id)}"},
-], ids=["expired", "signed_with_other_key", "not_access_type", "without_expiration", "not_a_jwt",
-        "valid_token_in_bearer_header"])
+@pytest.mark.parametrize(
+    "headers",
+    [
+        lambda user: with_access_token(access_token(user, exp=datetime.now(UTC) - timedelta(seconds=1))),
+        lambda user: with_access_token(access_token(user, key="other-secret-key-0123456789-0123456789")),
+        lambda user: with_access_token(access_token(user, type="refresh")),
+        lambda user: with_access_token(access_token(user, exp=None)),
+        lambda user: with_access_token(user.login),
+        lambda user: {"Authorization": f"Bearer {create_access_token(user.id)}"},
+    ],
+    ids=[
+        "expired",
+        "signed_with_other_key",
+        "not_access_type",
+        "without_expiration",
+        "not_a_jwt",
+        "valid_token_in_bearer_header",
+    ],
+)
 def test_invalid_access_token_is_rejected(client, make_user, headers):
     user = make_user()
 
@@ -108,11 +122,14 @@ def test_registered_user_can_login_and_use_cookies(client):
     assert me.json()["login"] == "user"
 
 
-@pytest.mark.parametrize("cookie, path, max_age", [
-    (ACCESS_TOKEN_COOKIE, "path=/;", settings.access_token_expire_minutes * 60),
-    # The refresh token is sent only to the auth endpoints, other requests never carry it
-    (REFRESH_TOKEN_COOKIE, "path=/api/v1/auth", settings.refresh_token_expire_days * 24 * 60 * 60),
-])
+@pytest.mark.parametrize(
+    "cookie, path, max_age",
+    [
+        (ACCESS_TOKEN_COOKIE, "path=/;", settings.access_token_expire_minutes * 60),
+        # The refresh token is sent only to the auth endpoints, other requests never carry it
+        (REFRESH_TOKEN_COOKIE, "path=/api/v1/auth", settings.refresh_token_expire_days * 24 * 60 * 60),
+    ],
+)
 def test_login_sets_cookie_hidden_from_javascript(client, make_user, cookie, path, max_age):
     make_user()
 

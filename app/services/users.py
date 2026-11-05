@@ -6,8 +6,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.exceptions import UserAlreadyExistsError
 from app.core.security import hash_password
-from app.schemas import UserResponse
 from app.repository import users as user_repository
+from app.schemas import UserResponse
 
 logger = logging.getLogger(__name__)
 

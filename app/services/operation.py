@@ -8,32 +8,32 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.exceptions import InsufficientFundsError, WalletNotFoundError
 from app.enums import OperationType
 from app.models import User
-from app.schemas import OperationRequest, OperationResponse
-from app.repository import wallets as wallet_repository
 from app.repository import operations as operations_repository
+from app.repository import wallets as wallet_repository
+from app.schemas import OperationRequest, OperationResponse
 from app.services.exchange_service import get_exchange_rate
 
 
-async def add_income(db: AsyncSession, current_user: User, operation: OperationRequest):
+async def add_income(db: AsyncSession, current_user: User, operation: OperationRequest) -> OperationResponse:
     wallet = await wallet_repository.get_wallet_by_name_for_update(db, current_user.id, operation.wallet_name)
     if not wallet:
         raise WalletNotFoundError(operation.wallet_name)
 
     wallet.balance += operation.amount
-    operation = await operations_repository.create_operation(
+    created = await operations_repository.create_operation(
         db=db,
         wallet_id=wallet.id,
         type=OperationType.INCOME,
         amount=operation.amount,
         currency=wallet.currency,
-        description=operation.description
+        description=operation.description,
     )
     await db.commit()
 
-    return OperationResponse.model_validate(operation)
+    return OperationResponse.model_validate(created)
 
 
-async def add_expense(db: AsyncSession, current_user: User, operation: OperationRequest):
+async def add_expense(db: AsyncSession, current_user: User, operation: OperationRequest) -> OperationResponse:
     wallet = await wallet_repository.get_wallet_by_name_for_update(db, current_user.id, operation.wallet_name)
     if not wallet:
         raise WalletNotFoundError(operation.wallet_name)
@@ -42,25 +42,25 @@ async def add_expense(db: AsyncSession, current_user: User, operation: Operation
         raise InsufficientFundsError(wallet.balance, wallet.currency)
 
     wallet.balance -= operation.amount
-    operation = await operations_repository.create_operation(
+    created = await operations_repository.create_operation(
         db=db,
         wallet_id=wallet.id,
         type=OperationType.EXPENSE,
         amount=operation.amount,
         currency=wallet.currency,
-        description=operation.description
+        description=operation.description,
     )
     await db.commit()
 
-    return OperationResponse.model_validate(operation)
+    return OperationResponse.model_validate(created)
 
 
 async def get_operations_list(
-        db: AsyncSession,
-        current_user: User,
-        wallet_id: int | None = None,
-        date_from: datetime | None = None,
-        date_to: datetime | None = None
+    db: AsyncSession,
+    current_user: User,
+    wallet_id: int | None = None,
+    date_from: datetime | None = None,
+    date_to: datetime | None = None,
 ) -> list[OperationResponse]:
     if wallet_id:
         wallet = await wallet_repository.get_wallet_by_id(db, current_user.id, wallet_id)
@@ -76,9 +76,14 @@ async def get_operations_list(
     return [OperationResponse.model_validate(operation) for operation in operations]
 
 
-async def transfer_between_wallets(db: AsyncSession, http_session: aiohttp.ClientSession, user_id: int,
-                                   from_wallet_id: int, to_wallet_id: int,
-                                   amount: Decimal) -> list[OperationResponse]:
+async def transfer_between_wallets(
+    db: AsyncSession,
+    http_session: aiohttp.ClientSession,
+    user_id: int,
+    from_wallet_id: int,
+    to_wallet_id: int,
+    amount: Decimal,
+) -> list[OperationResponse]:
     from_wallet = await wallet_repository.get_wallet_by_id(db, user_id, from_wallet_id)
     to_wallet = await wallet_repository.get_wallet_by_id(db, user_id, to_wallet_id)
 
@@ -111,7 +116,7 @@ async def transfer_between_wallets(db: AsyncSession, http_session: aiohttp.Clien
         category="transfer",
         subcategory="outgoing",
         transfer_id=transfer_id,
-        description=f"Transfer to {to_wallet.name}"
+        description=f"Transfer to {to_wallet.name}",
     )
     incoming = await operations_repository.create_operation(
         db=db,
@@ -122,7 +127,7 @@ async def transfer_between_wallets(db: AsyncSession, http_session: aiohttp.Clien
         category="transfer",
         subcategory="incoming",
         transfer_id=transfer_id,
-        description=f"Transfer from {from_wallet.name}"
+        description=f"Transfer from {from_wallet.name}",
     )
     await db.commit()
     return [OperationResponse.model_validate(outgoing), OperationResponse.model_validate(incoming)]

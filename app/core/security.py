@@ -1,6 +1,6 @@
 import hashlib
 import secrets
-from datetime import datetime, timedelta, UTC
+from datetime import UTC, datetime, timedelta
 
 import jwt
 from pwdlib import PasswordHash
@@ -29,17 +29,14 @@ def create_access_token(user_id: int) -> str:
         "sub": str(user_id),
         "type": ACCESS_TOKEN_TYPE,
         "iat": now,
-        "exp": now + timedelta(minutes=settings.access_token_expire_minutes)
+        "exp": now + timedelta(minutes=settings.access_token_expire_minutes),
     }
     return jwt.encode(payload, settings.jwt_secret_key, algorithm=settings.jwt_algorithm)
 
 
 def decode_access_token(token: str) -> int:
     payload = jwt.decode(
-        token,
-        settings.jwt_secret_key,
-        algorithms=[settings.jwt_algorithm],
-        options={"require": ["exp", "sub"]}
+        token, settings.jwt_secret_key, algorithms=[settings.jwt_algorithm], options={"require": ["exp", "sub"]}
     )
     if payload.get("type") != ACCESS_TOKEN_TYPE:
         raise jwt.InvalidTokenError("Not an access token")

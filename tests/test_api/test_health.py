@@ -51,10 +51,14 @@ def test_ready_when_database_answers(client):
     assert response.json() == {"status": "ok"}
 
 
-@pytest.mark.parametrize("session, logged_reason", [
-    (BrokenDatabaseSession(), "connection refused"),
-    (SlowDatabaseSession(), "TimeoutError"),
-], ids=["database_is_down", "database_does_not_answer_in_time"])
+@pytest.mark.parametrize(
+    "session, logged_reason",
+    [
+        (BrokenDatabaseSession(), "connection refused"),
+        (SlowDatabaseSession(), "TimeoutError"),
+    ],
+    ids=["database_is_down", "database_does_not_answer_in_time"],
+)
 def test_ready_when_database_is_unavailable(client, database_session, monkeypatch, caplog, session, logged_reason):
     monkeypatch.setattr(settings, "health_check_timeout_seconds", 0.05)
     database_session(session)
