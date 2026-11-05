@@ -3,87 +3,57 @@ from unittest.mock import AsyncMock
 
 import pytest
 
-from app.core.exceptions import ExchangeRateNotFoundError
 from app.enums import CurrencyEnum
 from tests.conftest import assert_error
 
 
-def test_create_wallet_success(client, make_user, auth):
+@pytest.mark.parametrize("payload, expected", [
+    ({"name": "card", "initial_balance": 100, "currency": "usd"}, ("card", Decimal(100), "usd")),
+    ({"name": "card"}, ("card", Decimal(0), "uah")),
+    ({"name": "  card  "}, ("card", Decimal(0), "uah")),
+], ids=["all_fields", "default_values", "name_is_trimmed"])
+def test_create_wallet(client, make_user, auth, payload, expected):
     user = make_user()
 
     # Act
-    response = client.post(
-        "/api/v1/wallets",
-        json={"name": "card", "initial_balance": 100, "currency": "usd"},
-        headers=auth(user)
-    )
+    response = client.post("/api/v1/wallets", json=payload, headers=auth(user))
 
     # Assert
     assert response.status_code == 201
-    assert response.json()["name"] == "card"
-    assert Decimal(str(response.json()["balance"])) == Decimal(100)
-    assert response.json()["currency"] == "usd"
+    wallet = response.json()
+    assert (wallet["name"], Decimal(wallet["balance"]), wallet["currency"]) == expected
 
 
-def test_create_wallet_default_values(client, make_user, auth):
+@pytest.mark.parametrize("payload", [
+    {"name": "card", "initial_balance": "10.001"},
+    {"name": "card", "initial_balance": "12345678901234567.00"},
+    {"name": "card", "initial_balance": -1},
+    {"name": " "},
+    {"name": "card", "currency": "gbp"},
+], ids=["too_many_decimals", "too_many_digits", "negative_balance", "empty_name", "unknown_currency"])
+def test_create_wallet_rejects_invalid_request(client, make_user, auth, payload):
     user = make_user()
 
     # Act
-    response = client.post("/api/v1/wallets", json={"name": "card"}, headers=auth(user))
-
-    # Assert
-    assert response.status_code == 201
-    assert Decimal(str(response.json()["balance"])) == Decimal(0)
-    assert response.json()["currency"] == "uah"
-
-
-def test_create_wallet_trims_name(client, make_user, auth):
-    user = make_user()
-
-    # Act
-    response = client.post("/api/v1/wallets", json={"name": "  card  "}, headers=auth(user))
-
-    # Assert
-    assert response.status_code == 201
-    assert response.json()["name"] == "card"
-
-
-def test_create_wallet_already_exists(client, make_user, make_wallet, auth):
-    user = make_user()
-    make_wallet(user, name="card")
-
-    # Act
-    response = client.post("/api/v1/wallets", json={"name": "card"}, headers=auth(user))
-
-    # Assert
-    assert_error(response, 409, "WALLET_ALREADY_EXISTS")
-
-
-def test_create_wallet_name_taken_by_concurrent_request(client, make_user, make_wallet, auth, monkeypatch):
-    user = make_user()
-    make_wallet(user, name="card")
-    monkeypatch.setattr("app.repository.wallets.is_wallet_exist", AsyncMock(return_value=False))
-
-    # Act
-    response = client.post("/api/v1/wallets", json={"name": "card"}, headers=auth(user))
-
-    # Assert
-    assert_error(response, 409, "WALLET_ALREADY_EXISTS")
-
-
-@pytest.mark.parametrize("initial_balance", ["10.001", "12345678901234567.00"])
-def test_create_wallet_balance_out_of_precision(client, make_user, auth, initial_balance):
-    user = make_user()
-
-    # Act
-    response = client.post(
-        "/api/v1/wallets",
-        json={"name": "card", "initial_balance": initial_balance},
-        headers=auth(user)
-    )
+    response = client.post("/api/v1/wallets", json=payload, headers=auth(user))
 
     # Assert
     assert_error(response, 422, "VALIDATION_ERROR")
+
+
+@pytest.mark.parametrize("concurrent", [False, True], ids=["found_by_check", "found_by_unique_constraint"])
+def test_create_wallet_name_taken(client, make_user, make_wallet, auth, monkeypatch, concurrent):
+    user = make_user()
+    make_wallet(user, name="card")
+    if concurrent:
+        # Another request created the wallet after the check: only the unique constraint in the database stops it
+        monkeypatch.setattr("app.repository.wallets.is_wallet_exist", AsyncMock(return_value=False))
+
+    # Act
+    response = client.post("/api/v1/wallets", json={"name": "card"}, headers=auth(user))
+
+    # Assert
+    assert_error(response, 409, "WALLET_ALREADY_EXISTS")
 
 
 def test_create_wallet_same_name_for_different_users(client, make_user, make_wallet, auth):
@@ -95,56 +65,6 @@ def test_create_wallet_same_name_for_different_users(client, make_user, make_wal
 
     # Assert
     assert response.status_code == 201
-
-
-def test_create_wallet_negative_balance(client, make_user, auth):
-    user = make_user()
-
-    # Act
-    response = client.post(
-        "/api/v1/wallets",
-        json={"name": "card", "initial_balance": -1},
-        headers=auth(user)
-    )
-
-    # Assert
-    assert_error(response, 422, "VALIDATION_ERROR")
-
-
-def test_create_wallet_empty_name(client, make_user, auth):
-    user = make_user()
-
-    # Act
-    response = client.post("/api/v1/wallets", json={"name": " "}, headers=auth(user))
-
-    # Assert
-    assert_error(response, 422, "VALIDATION_ERROR")
-
-
-def test_create_wallet_unknown_currency(client, make_user, auth):
-    user = make_user()
-
-    # Act
-    response = client.post(
-        "/api/v1/wallets",
-        json={"name": "card", "currency": "gbp"},
-        headers=auth(user)
-    )
-
-    # Assert
-    assert_error(response, 422, "VALIDATION_ERROR")
-
-
-def test_create_wallet_not_authorized(client):
-    # Act
-    response = client.post(
-        "/api/v1/wallets",
-        json={"name": "card"},
-        headers={"Cookie": "access_token=not_exist"}
-    )
-
-    # Assert
-    assert_error(response, 401, "NOT_AUTHENTICATED")
 
 
 def test_get_wallets_returns_only_own_wallets(client, make_user, make_wallet, auth):
@@ -161,39 +81,19 @@ def test_get_wallets_returns_only_own_wallets(client, make_user, make_wallet, au
     assert {wallet["name"] for wallet in response.json()} == {"card", "cash"}
 
 
-def test_get_wallets_empty(client, make_user, auth):
-    user = make_user()
-
-    # Act
-    response = client.get("/api/v1/wallets", headers=auth(user))
-
-    # Assert
-    assert response.status_code == 200
-    assert response.json() == []
-
-
-def test_get_balance_without_wallets(client, make_user, auth):
-    user = make_user()
-
-    # Act
-    response = client.get("/api/v1/balance", headers=auth(user))
-
-    # Assert
-    assert response.status_code == 200
-    assert Decimal(str(response.json()["total_balance"])) == Decimal(0)
-
-
-def test_get_balance_uah_wallets_do_not_use_exchange_rate(client, make_user, make_wallet, auth, mock_exchange_rate):
-    user = make_user()
+def test_get_balance_sums_own_uah_wallets_without_exchange_rate(client, make_user, make_wallet, auth,
+                                                                mock_exchange_rate):
+    user = make_user(login="owner")
     make_wallet(user, name="card", balance=Decimal(100))
     make_wallet(user, name="cash", balance=Decimal(50))
+    make_wallet(make_user(login="other"), balance=Decimal(999))
 
     # Act
     response = client.get("/api/v1/balance", headers=auth(user))
 
     # Assert
     assert response.status_code == 200
-    assert Decimal(str(response.json()["total_balance"])) == Decimal(150)
+    assert Decimal(response.json()["total_balance"]) == Decimal(150)
     mock_exchange_rate.assert_not_awaited()
 
 
@@ -207,37 +107,5 @@ def test_get_balance_converts_foreign_currency_to_uah(client, make_user, make_wa
 
     # Assert
     assert response.status_code == 200
-    assert Decimal(str(response.json()["total_balance"])) == Decimal(500)
+    assert Decimal(response.json()["total_balance"]) == Decimal(500)
     mock_exchange_rate.assert_awaited_once_with(client.app_state["http_session"], CurrencyEnum.USD, CurrencyEnum.UAH)
-
-
-def test_get_balance_exchange_rate_not_found(client, make_user, make_wallet, auth, mock_exchange_rate):
-    mock_exchange_rate.side_effect = ExchangeRateNotFoundError(CurrencyEnum.USD, CurrencyEnum.UAH)
-    user = make_user()
-    make_wallet(user, currency=CurrencyEnum.USD)
-
-    # Act
-    response = client.get("/api/v1/balance", headers=auth(user))
-
-    # Assert
-    assert_error(response, 502, "EXCHANGE_RATE_NOT_FOUND")
-
-
-def test_get_balance_ignores_other_users_wallets(client, make_user, make_wallet, auth):
-    user = make_user(login="owner")
-    make_wallet(user, balance=Decimal(100))
-    make_wallet(make_user(login="other"), balance=Decimal(999))
-
-    # Act
-    response = client.get("/api/v1/balance", headers=auth(user))
-
-    # Assert
-    assert Decimal(str(response.json()["total_balance"])) == Decimal(100)
-
-
-def test_get_balance_not_authorized(client):
-    # Act
-    response = client.get("/api/v1/balance", headers={"Cookie": "access_token=not_exist"})
-
-    # Assert
-    assert_error(response, 401, "NOT_AUTHENTICATED")

@@ -1,6 +1,8 @@
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+from app.core.logging import LogFormat, LogLevel
+
 
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
@@ -12,6 +14,10 @@ class Settings(BaseSettings):
     jwt_algorithm: str = "HS256"
     access_token_expire_minutes: int = 30
     refresh_token_expire_days: int = 7
+    health_check_timeout_seconds: float = 2.0
+    log_level: LogLevel = "INFO"
+    # text for local development, json for servers where logs are collected
+    log_format: LogFormat = "text"
 
 
 settings = Settings()

@@ -68,9 +68,10 @@ async def handle_validation_error(_: Request, error: RequestValidationError) -> 
     return error_response(422, ErrorCode.VALIDATION_ERROR, "Request validation failed", details)
 
 
-async def handle_unexpected_error(request: Request, error: Exception) -> JSONResponse:
+def unexpected_error_response(method: str, path: str, error: Exception) -> JSONResponse:
+    # Called by RequestContextMiddleware for any error no handler above took.
     # The client gets no details: they can contain SQL, file paths or data of other users
-    logger.error("Unhandled error on %s %s", request.method, request.url.path, exc_info=error)
+    logger.error("Unhandled error on %s %s", method, path, exc_info=error)
     return error_response(500, ErrorCode.INTERNAL_ERROR, "Internal server error")
 
 
@@ -78,7 +79,7 @@ def register_exception_handlers(app: FastAPI) -> None:
     app.add_exception_handler(AppError, handle_app_error)
     app.add_exception_handler(StarletteHTTPException, handle_http_exception)
     app.add_exception_handler(RequestValidationError, handle_validation_error)
-    app.add_exception_handler(Exception, handle_unexpected_error)
+    # Unhandled errors are turned into 500 by RequestContextMiddleware, see unexpected_error_response
 
 
 def _documented_response(status_code: int, codes: list[ErrorCode]) -> dict[str, Any]:
