@@ -68,4 +68,7 @@ def test_login_works_when_redis_is_unavailable(client, make_user, monkeypatch, c
 
     # Assert
     assert response.status_code == 204
-    assert any("rate limit" in record.getMessage().lower() for record in caplog.records)
+    errors = [record for record in caplog.records if record.name == "app.services.rate_limit"]
+    assert [record.levelno for record in errors] == [logging.ERROR]
+    # The cause is known, a traceback on every request would flood the log
+    assert errors[0].exc_info is None
