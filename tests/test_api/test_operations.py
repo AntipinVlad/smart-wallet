@@ -2,9 +2,10 @@ from datetime import datetime
 from decimal import Decimal
 
 import pytest
-from fastapi import HTTPException
 
+from app.core.exceptions import ExchangeRateNotFoundError
 from app.enum import CurrencyEnum
+from tests.conftest import assert_error
 
 
 def test_add_income_success(client, db_session, make_user, make_wallet, auth):
@@ -43,7 +44,7 @@ def test_add_income_not_positive_amount(client, make_user, make_wallet, auth, am
     )
 
     # Assert
-    assert response.status_code == 422
+    assert_error(response, 422, "VALIDATION_ERROR")
 
 
 def test_add_income_without_description(client, make_user, make_wallet, auth):
@@ -74,7 +75,7 @@ def test_add_income_description_too_long(client, make_user, make_wallet, auth):
     )
 
     # Assert
-    assert response.status_code == 422
+    assert_error(response, 422, "VALIDATION_ERROR")
 
 
 @pytest.mark.parametrize("endpoint", ["income", "expense"])
@@ -91,7 +92,7 @@ def test_operation_amount_out_of_precision(client, db_session, make_user, make_w
     )
 
     # Assert
-    assert response.status_code == 422
+    assert_error(response, 422, "VALIDATION_ERROR")
     db_session.refresh(wallet)
     assert wallet.balance == Decimal(200)
 
@@ -107,7 +108,7 @@ def test_add_income_wallet_not_exist(client, make_user, auth):
     )
 
     # Assert
-    assert response.status_code == 404
+    assert_error(response, 404, "WALLET_NOT_FOUND")
 
 
 def test_add_income_to_other_users_wallet(client, db_session, make_user, make_wallet, auth):
@@ -122,7 +123,7 @@ def test_add_income_to_other_users_wallet(client, db_session, make_user, make_wa
     )
 
     # Assert
-    assert response.status_code == 404
+    assert_error(response, 404, "WALLET_NOT_FOUND")
     db_session.refresh(wallet)
     assert wallet.balance == Decimal(200)
 
@@ -178,7 +179,7 @@ def test_add_expense_not_enough_money(client, db_session, make_user, make_wallet
     )
 
     # Assert
-    assert response.status_code == 400
+    assert_error(response, 409, "INSUFFICIENT_FUNDS")
     db_session.refresh(wallet)
     assert wallet.balance == Decimal(200)
 
@@ -195,7 +196,7 @@ def test_add_expense_negative(client, make_user, make_wallet, auth):
     )
 
     # Assert
-    assert response.status_code == 422
+    assert_error(response, 422, "VALIDATION_ERROR")
 
 
 def test_add_expense_empty_name(client, make_user, make_wallet, auth):
@@ -210,7 +211,7 @@ def test_add_expense_empty_name(client, make_user, make_wallet, auth):
     )
 
     # Assert
-    assert response.status_code == 422
+    assert_error(response, 422, "VALIDATION_ERROR")
 
 
 def test_add_expense_wallet_not_exist(client, make_user, auth):
@@ -224,7 +225,7 @@ def test_add_expense_wallet_not_exist(client, make_user, auth):
     )
 
     # Assert
-    assert response.status_code == 404
+    assert_error(response, 404, "WALLET_NOT_FOUND")
 
 
 def test_add_expense_not_authorized(client):
@@ -236,7 +237,7 @@ def test_add_expense_not_authorized(client):
     )
 
     # Assert
-    assert response.status_code == 401
+    assert_error(response, 401, "NOT_AUTHENTICATED")
 
 
 def test_get_operations_for_all_own_wallets(client, make_user, make_wallet, make_operation, auth):
@@ -274,7 +275,7 @@ def test_get_operations_wallet_not_exist(client, make_user, auth):
     response = client.get("/api/v1/operations", params={"wallet_id": 999}, headers=auth(user))
 
     # Assert
-    assert response.status_code == 404
+    assert_error(response, 404, "WALLET_NOT_FOUND")
 
 
 def test_get_operations_other_users_wallet(client, make_user, make_wallet, auth):
@@ -285,7 +286,7 @@ def test_get_operations_other_users_wallet(client, make_user, make_wallet, auth)
     response = client.get("/api/v1/operations", params={"wallet_id": wallet.id}, headers=auth(other))
 
     # Assert
-    assert response.status_code == 404
+    assert_error(response, 404, "WALLET_NOT_FOUND")
 
 
 def test_get_operations_by_date_range(client, make_user, make_wallet, make_operation, auth):
@@ -312,7 +313,7 @@ def test_get_operations_not_authorized(client):
     response = client.get("/api/v1/operations", headers={"Cookie": "access_token=not_exist"})
 
     # Assert
-    assert response.status_code == 401
+    assert_error(response, 401, "NOT_AUTHENTICATED")
 
 
 def test_transfer_same_currency(client, db_session, make_user, make_wallet, auth):
@@ -429,7 +430,7 @@ def test_transfer_appears_in_history_of_both_wallets(client, make_user, make_wal
 
 def test_transfer_exchange_rate_not_found_changes_nothing(client, db_session, make_user, make_wallet, auth,
                                                           mock_exchange_rate):
-    mock_exchange_rate.side_effect = HTTPException(status_code=404, detail="Exchange rate not found")
+    mock_exchange_rate.side_effect = ExchangeRateNotFoundError(CurrencyEnum.USD, CurrencyEnum.UAH)
     user = make_user()
     source = make_wallet(user, name="dollars", balance=Decimal(200), currency=CurrencyEnum.USD)
     target = make_wallet(user, name="card", balance=Decimal(10))
@@ -443,7 +444,7 @@ def test_transfer_exchange_rate_not_found_changes_nothing(client, db_session, ma
     history = client.get("/api/v1/operations", headers=auth(user))
 
     # Assert
-    assert response.status_code == 404
+    assert_error(response, 502, "EXCHANGE_RATE_NOT_FOUND")
     assert history.json() == []
     db_session.refresh(source)
     db_session.refresh(target)
@@ -464,7 +465,7 @@ def test_transfer_not_enough_money(client, db_session, make_user, make_wallet, a
     )
 
     # Assert
-    assert response.status_code == 400
+    assert_error(response, 409, "INSUFFICIENT_FUNDS")
     db_session.refresh(source)
     assert source.balance == Decimal(20)
 
@@ -481,7 +482,7 @@ def test_transfer_wallet_not_exist(client, make_user, make_wallet, auth):
     )
 
     # Assert
-    assert response.status_code == 404
+    assert_error(response, 404, "WALLET_NOT_FOUND")
 
 
 def test_transfer_to_other_users_wallet(client, db_session, make_user, make_wallet, auth):
@@ -497,7 +498,7 @@ def test_transfer_to_other_users_wallet(client, db_session, make_user, make_wall
     )
 
     # Assert
-    assert response.status_code == 404
+    assert_error(response, 404, "WALLET_NOT_FOUND")
     db_session.refresh(source)
     assert source.balance == Decimal(200)
 
@@ -514,7 +515,7 @@ def test_transfer_to_same_wallet(client, make_user, make_wallet, auth):
     )
 
     # Assert
-    assert response.status_code == 422
+    assert_error(response, 422, "VALIDATION_ERROR")
 
 
 def test_transfer_negative_amount(client, make_user, make_wallet, auth):
@@ -530,7 +531,7 @@ def test_transfer_negative_amount(client, make_user, make_wallet, auth):
     )
 
     # Assert
-    assert response.status_code == 422
+    assert_error(response, 422, "VALIDATION_ERROR")
 
 
 def test_transfer_amount_out_of_precision(client, make_user, make_wallet, auth):
@@ -546,7 +547,7 @@ def test_transfer_amount_out_of_precision(client, make_user, make_wallet, auth):
     )
 
     # Assert
-    assert response.status_code == 422
+    assert_error(response, 422, "VALIDATION_ERROR")
 
 
 def test_transfer_not_authorized(client):
@@ -558,4 +559,4 @@ def test_transfer_not_authorized(client):
     )
 
     # Assert
-    assert response.status_code == 401
+    assert_error(response, 401, "NOT_AUTHENTICATED")

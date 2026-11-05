@@ -2,9 +2,9 @@ from decimal import Decimal
 
 import aiohttp
 import pytest
-from fastapi import HTTPException
 
 from app.core.config import settings
+from app.core.exceptions import ExchangeRateNotFoundError, ExchangeServiceUnavailableError
 from app.enum import CurrencyEnum
 from app.services.exchange_service import get_exchange_rate
 
@@ -61,11 +61,8 @@ async def test_get_exchange_rate_api_unavailable():
     session = FakeSession(None)
 
     # Act
-    with pytest.raises(HTTPException) as error:
+    with pytest.raises(ExchangeServiceUnavailableError):
         await get_exchange_rate(session, CurrencyEnum.USD, CurrencyEnum.UAH)
-
-    # Assert
-    assert error.value.status_code == 503
 
 
 @pytest.mark.anyio
@@ -74,8 +71,5 @@ async def test_get_exchange_rate_not_found(data):
     session = FakeSession(data)
 
     # Act
-    with pytest.raises(HTTPException) as error:
+    with pytest.raises(ExchangeRateNotFoundError):
         await get_exchange_rate(session, CurrencyEnum.USD, CurrencyEnum.UAH)
-
-    # Assert
-    assert error.value.status_code == 404

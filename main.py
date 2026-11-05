@@ -4,6 +4,7 @@ from contextlib import asynccontextmanager
 import aiohttp
 from fastapi import FastAPI
 
+from app.api.errors import INTERNAL_ERROR_RESPONSES, register_exception_handlers
 from app.api.v1.auth import router as auth_router
 from app.api.v1.wallets import router as wallet_router
 from app.api.v1.operations import router as operation_router
@@ -23,7 +24,8 @@ async def lifespan(_: FastAPI) -> AsyncIterator[AppState]:
     await engine.dispose()
 
 
-app = FastAPI(lifespan=lifespan)
+app = FastAPI(lifespan=lifespan, responses=INTERNAL_ERROR_RESPONSES)
+register_exception_handlers(app)
 
 app.include_router(auth_router, prefix="/api/v1", tags=["auth"])
 app.include_router(users_router, prefix="/api/v1", tags=["users"])

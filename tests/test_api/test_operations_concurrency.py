@@ -16,7 +16,7 @@ from sqlalchemy.orm import Session
 
 from app.enum import CurrencyEnum
 from app.models import Wallet
-from tests.conftest import SyncSessionLocal
+from tests.conftest import assert_error, SyncSessionLocal
 
 # How long a request is given to reach the lock. Long enough for a local request, short enough for the suite
 REQUEST_START_SECONDS = 0.5
@@ -85,7 +85,7 @@ def test_expense_sees_balance_changed_concurrently(client, db_session, make_user
     response = request.result(timeout=REQUEST_FINISH_SECONDS)
 
     # Assert
-    assert response.status_code == 400
+    assert_error(response, 409, "INSUFFICIENT_FUNDS")
     db_session.refresh(wallet)
     assert wallet.balance == Decimal(30)
 
@@ -106,7 +106,7 @@ def test_transfer_sees_source_balance_changed_concurrently(client, db_session, m
     response = request.result(timeout=REQUEST_FINISH_SECONDS)
 
     # Assert
-    assert response.status_code == 400
+    assert_error(response, 409, "INSUFFICIENT_FUNDS")
     db_session.refresh(source)
     db_session.refresh(target)
     assert source.balance == Decimal(30)

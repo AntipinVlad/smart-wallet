@@ -3,9 +3,9 @@ from decimal import Decimal
 from uuid import uuid4
 
 import aiohttp
-from fastapi import HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.exceptions import InsufficientFundsError, WalletNotFoundError
 from app.enum import OperationType
 from app.models import User
 from app.schemas import OperationRequest, OperationResponse
@@ -17,7 +17,7 @@ from app.services.exchange_service import get_exchange_rate
 async def add_income(db: AsyncSession, current_user: User, operation: OperationRequest):
     wallet = await wallet_repository.get_wallet_by_name_for_update(db, current_user.id, operation.wallet_name)
     if not wallet:
-        raise HTTPException(status_code=404, detail=f"Wallet '{operation.wallet_name}' not found")
+        raise WalletNotFoundError(operation.wallet_name)
 
     wallet.balance += operation.amount
     operation = await operations_repository.create_operation(
@@ -36,10 +36,10 @@ async def add_income(db: AsyncSession, current_user: User, operation: OperationR
 async def add_expense(db: AsyncSession, current_user: User, operation: OperationRequest):
     wallet = await wallet_repository.get_wallet_by_name_for_update(db, current_user.id, operation.wallet_name)
     if not wallet:
-        raise HTTPException(status_code=404, detail=f"Wallet '{operation.wallet_name}' not found")
+        raise WalletNotFoundError(operation.wallet_name)
 
     if wallet.balance < operation.amount:
-        raise HTTPException(status_code=400, detail=f"Insufficient funds. Available: {wallet.balance}")
+        raise InsufficientFundsError(wallet.balance, wallet.currency)
 
     wallet.balance -= operation.amount
     operation = await operations_repository.create_operation(
@@ -65,7 +65,7 @@ async def get_operations_list(
     if wallet_id:
         wallet = await wallet_repository.get_wallet_by_id(db, current_user.id, wallet_id)
         if not wallet:
-            raise HTTPException(status_code=404, detail=f"Wallet '{wallet_id}' not found")
+            raise WalletNotFoundError(wallet_id)
 
         wallets_ids = [wallet.id]
     else:
@@ -83,7 +83,7 @@ async def transfer_between_wallets(db: AsyncSession, http_session: aiohttp.Clien
     to_wallet = await wallet_repository.get_wallet_by_id(db, user_id, to_wallet_id)
 
     if not from_wallet or not to_wallet:
-        raise HTTPException(404, "Wallet not found")
+        raise WalletNotFoundError()
 
     # The rate is requested before locking: waiting for an external API while holding the locks
     # would block every other operation on both wallets
@@ -97,7 +97,7 @@ async def transfer_between_wallets(db: AsyncSession, http_session: aiohttp.Clien
     await wallet_repository.get_wallets_by_ids_for_update(db, user_id, [from_wallet.id, to_wallet.id])
 
     if from_wallet.balance < amount:
-        raise HTTPException(400, f"Not enough funds. Available: {from_wallet.balance} {from_wallet.currency}")
+        raise InsufficientFundsError(from_wallet.balance, from_wallet.currency)
 
     from_wallet.balance = round(from_wallet.balance - amount, 2)
     to_wallet.balance = round(to_wallet.balance + target_amount, 2)

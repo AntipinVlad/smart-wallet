@@ -4,6 +4,7 @@ from typing import Annotated
 
 from pydantic import BaseModel, Field, field_validator
 
+from app.core.exceptions import ErrorCode
 from app.enum import CurrencyEnum
 
 Money = Annotated[Decimal, Field(max_digits=18, decimal_places=2)]
@@ -115,3 +116,17 @@ class TransferCreateSchema(BaseModel):
 
 class TotalBalance(BaseModel):
     total_balance: Decimal
+
+class ErrorDetail(BaseModel):
+    field: str = Field(..., examples=["body.login"])
+    message: str = Field(..., examples=["Field required"])
+
+
+class ErrorBody(BaseModel):
+    code: ErrorCode = Field(..., description="Stable error code. Check it instead of the message")
+    message: str = Field(..., description="Human readable description, may change")
+    details: list[ErrorDetail] | None = Field(None, description="Invalid fields, only for VALIDATION_ERROR")
+
+
+class ErrorResponse(BaseModel):
+    error: ErrorBody
