@@ -3,7 +3,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.errors import error_responses
 from app.core.exceptions import NotAuthenticatedError, UserAlreadyExistsError
-from app.dependency import get_db, get_current_user
+from app.api.deps import get_db, get_current_user
 from app.models import User
 from app.services import users as user_service
 from app.schemas import UserCreateRequest, UserResponse

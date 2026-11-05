@@ -6,7 +6,7 @@ import aiohttp
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.exceptions import InsufficientFundsError, WalletNotFoundError
-from app.enum import OperationType
+from app.enums import OperationType
 from app.models import User
 from app.schemas import OperationRequest, OperationResponse
 from app.repository import wallets as wallet_repository

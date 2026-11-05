@@ -1,7 +1,7 @@
 import pytest
 
 from app.core.config import settings
-from main import app, lifespan
+from app.main import app, lifespan
 
 
 @pytest.fixture()

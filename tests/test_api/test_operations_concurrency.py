@@ -14,7 +14,7 @@ import pytest
 from sqlalchemy.exc import OperationalError
 from sqlalchemy.orm import Session
 
-from app.enum import CurrencyEnum
+from app.enums import CurrencyEnum
 from app.models import Wallet
 from tests.conftest import assert_error, SyncSessionLocal
 

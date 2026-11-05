@@ -26,9 +26,9 @@ from app.core.cookies import ACCESS_TOKEN_COOKIE
 from app.core.exceptions import ErrorCode
 from app.core.security import create_access_token, hash_password
 from app.database import Base
-from app.enum import CurrencyEnum, OperationType
+from app.enums import CurrencyEnum, OperationType
 from app.models import Operation, User, Wallet
-from main import app
+from app.main import app
 
 PASSWORD = "correct-password"
 PASSWORD_HASH = hash_password(PASSWORD)

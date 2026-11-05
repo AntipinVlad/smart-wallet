@@ -11,7 +11,7 @@ from app.api.v1.operations import router as operation_router
 from app.api.v1.users import router as users_router
 from app.core.config import settings
 from app.database import engine
-from app.dependency import AppState
+from app.api.deps import AppState
 
 
 @asynccontextmanager

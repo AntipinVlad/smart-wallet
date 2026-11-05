@@ -6,7 +6,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.exceptions import WalletAlreadyExistsError
-from app.enum import CurrencyEnum
+from app.enums import CurrencyEnum
 from app.models import User
 from app.repository import wallets as wallet_repository
 from app.schemas import CreateWalletRequest, WalletResponse, TotalBalance

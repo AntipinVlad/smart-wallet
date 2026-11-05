@@ -9,7 +9,7 @@ from app.core.exceptions import (
     NotAuthenticatedError,
     WalletAlreadyExistsError,
 )
-from app.dependency import get_db, get_current_user, get_http_session
+from app.api.deps import get_db, get_current_user, get_http_session
 from app.models import User
 from app.schemas import CreateWalletRequest, WalletResponse, TotalBalance
 from app.services import wallets as wallets_service

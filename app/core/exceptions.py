@@ -1,7 +1,7 @@
 from decimal import Decimal
 from enum import StrEnum
 
-from app.enum import CurrencyEnum
+from app.enums import CurrencyEnum
 
 
 class ErrorCode(StrEnum):

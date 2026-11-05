@@ -4,7 +4,7 @@ from unittest.mock import AsyncMock
 import pytest
 
 from app.core.exceptions import ExchangeRateNotFoundError
-from app.enum import CurrencyEnum
+from app.enums import CurrencyEnum
 from tests.conftest import assert_error
 
 

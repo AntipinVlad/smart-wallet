@@ -4,7 +4,7 @@ import pytest
 
 from app.api.errors import status_code_for
 from app.core.exceptions import AppError, ErrorCode
-from main import app
+from app.main import app
 
 ERROR_SCHEMA_REF = "#/components/schemas/ErrorResponse"
 
