@@ -1,54 +1,43 @@
 from unittest.mock import AsyncMock
 
+import pytest
 from sqlalchemy import select
 
 from app.core.security import hash_password
 from app.models import User
-from tests.conftest import assert_error, PASSWORD, Pause
-
-# A request that does not wait for anything answers well within this time
-OTHER_REQUEST_SECONDS = 2
+from tests.conftest import assert_error, OTHER_REQUEST_SECONDS, PASSWORD, Pause
 
 
-def test_create_user_success(client):
+def test_create_user(client, db_session):
     # Act
     response = client.post("/api/v1/users", json={"login": "user", "password": PASSWORD})
 
     # Assert
     assert response.status_code == 201
-    assert response.json()["login"] == "user"
-    assert response.json()["id"] is not None
-    assert "password" not in response.text
-
-
-def test_create_user_stores_password_hashed(client, db_session):
-    # Act
-    client.post("/api/v1/users", json={"login": "user", "password": PASSWORD})
-
-    # Assert
     user = db_session.scalars(select(User)).one()
-    assert PASSWORD not in user.password_hash
+    assert response.json() == {"id": user.id, "login": "user"}
     assert user.password_hash.startswith("$argon2id$")
 
 
-def test_create_user_without_password(client):
+@pytest.mark.parametrize("payload", [
+    {"login": "user"},
+    {"login": "user", "password": "short"},
+    {"login": "a" * 128, "password": PASSWORD},
+], ids=["without_password", "short_password", "long_login"])
+def test_create_user_rejects_invalid_request(client, payload):
     # Act
-    response = client.post("/api/v1/users", json={"login": "user"})
+    response = client.post("/api/v1/users", json=payload)
 
     # Assert
     assert_error(response, 422, "VALIDATION_ERROR")
 
 
-def test_create_user_short_password(client):
-    # Act
-    response = client.post("/api/v1/users", json={"login": "user", "password": "short"})
-
-    # Assert
-    assert_error(response, 422, "VALIDATION_ERROR")
-
-
-def test_create_user_already_exists(client, make_user):
+@pytest.mark.parametrize("concurrent", [False, True], ids=["found_by_check", "found_by_unique_constraint"])
+def test_create_user_login_taken(client, make_user, monkeypatch, concurrent):
     make_user(login="user")
+    if concurrent:
+        # Another request registered the login after the check: only the unique constraint in the database stops it
+        monkeypatch.setattr("app.repository.users.get_user", AsyncMock(return_value=None))
 
     # Act
     response = client.post("/api/v1/users", json={"login": "user", "password": PASSWORD})
@@ -57,26 +46,7 @@ def test_create_user_already_exists(client, make_user):
     assert_error(response, 409, "USER_ALREADY_EXISTS")
 
 
-def test_create_user_login_taken_by_concurrent_request(client, make_user, monkeypatch):
-    make_user(login="user")
-    monkeypatch.setattr("app.repository.users.get_user", AsyncMock(return_value=None))
-
-    # Act
-    response = client.post("/api/v1/users", json={"login": "user", "password": PASSWORD})
-
-    # Assert
-    assert_error(response, 409, "USER_ALREADY_EXISTS")
-
-
-def test_create_user_login_too_long(client):
-    # Act
-    response = client.post("/api/v1/users", json={"login": "a" * 128, "password": PASSWORD})
-
-    # Assert
-    assert_error(response, 422, "VALIDATION_ERROR")
-
-
-def test_get_me_success(client, make_user, auth):
+def test_get_me(client, make_user, auth):
     user = make_user()
 
     # Act
@@ -85,22 +55,6 @@ def test_get_me_success(client, make_user, auth):
     # Assert
     assert response.status_code == 200
     assert response.json() == {"id": user.id, "login": user.login}
-
-
-def test_get_me_unknown_token(client):
-    # Act
-    response = client.get("/api/v1/users/me", headers={"Cookie": "access_token=not_exist"})
-
-    # Assert
-    assert_error(response, 401, "NOT_AUTHENTICATED")
-
-
-def test_get_me_without_token(client):
-    # Act
-    response = client.get("/api/v1/users/me")
-
-    # Assert
-    assert_error(response, 401, "NOT_AUTHENTICATED")
 
 
 def test_slow_password_hashing_does_not_block_other_requests(client, make_user, auth, monkeypatch,

@@ -8,6 +8,8 @@ def test_settings_read_from_environment(monkeypatch):
     monkeypatch.setenv("DATABASE_URL", "sqlite:///./from_env.db")
     monkeypatch.setenv("EXCHANGE_API_URL", "https://rates.test/v1")
     monkeypatch.setenv("EXCHANGE_API_TIMEOUT_SECONDS", "1.5")
+    monkeypatch.setenv("LOG_LEVEL", "WARNING")
+    monkeypatch.setenv("LOG_FORMAT", "json")
 
     # Act
     settings = Settings(_env_file=None)
@@ -16,6 +18,7 @@ def test_settings_read_from_environment(monkeypatch):
     assert settings.database_url == "sqlite:///./from_env.db"
     assert settings.exchange_api_url == "https://rates.test/v1"
     assert settings.exchange_api_timeout_seconds == 1.5
+    assert (settings.log_level, settings.log_format) == ("WARNING", "json")
 
 
 def test_settings_read_from_env_file(monkeypatch, tmp_path):
@@ -30,24 +33,22 @@ def test_settings_read_from_env_file(monkeypatch, tmp_path):
     assert settings.database_url == "sqlite:///./from_file.db"
 
 
-def test_settings_require_jwt_secret_key(monkeypatch):
-    monkeypatch.delenv("JWT_SECRET_KEY")
+@pytest.mark.parametrize("name", ["DATABASE_URL", "JWT_SECRET_KEY"])
+def test_settings_require_value(monkeypatch, name):
+    monkeypatch.delenv(name)
 
     # Act
     with pytest.raises(ValidationError):
         Settings(_env_file=None)
 
 
-def test_settings_reject_short_jwt_secret_key(monkeypatch):
-    monkeypatch.setenv("JWT_SECRET_KEY", "too-short")
-
-    # Act
-    with pytest.raises(ValidationError):
-        Settings(_env_file=None)
-
-
-def test_settings_require_database_url(monkeypatch):
-    monkeypatch.delenv("DATABASE_URL")
+@pytest.mark.parametrize("name, value", [
+    ("JWT_SECRET_KEY", "too-short"),
+    ("LOG_LEVEL", "VERBOSE"),
+    ("LOG_FORMAT", "xml"),
+])
+def test_settings_reject_invalid_value(monkeypatch, name, value):
+    monkeypatch.setenv(name, value)
 
     # Act
     with pytest.raises(ValidationError):

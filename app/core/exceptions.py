@@ -17,6 +17,7 @@ class ErrorCode(StrEnum):
     INSUFFICIENT_FUNDS = "INSUFFICIENT_FUNDS"
     EXCHANGE_RATE_NOT_FOUND = "EXCHANGE_RATE_NOT_FOUND"
     EXCHANGE_SERVICE_UNAVAILABLE = "EXCHANGE_SERVICE_UNAVAILABLE"
+    DATABASE_UNAVAILABLE = "DATABASE_UNAVAILABLE"
 
     # Set by the error handlers in app/api/errors.py
     VALIDATION_ERROR = "VALIDATION_ERROR"
@@ -44,7 +45,7 @@ class AppError(Exception):
 
 
 class NotFoundError(AppError):
-    pass
+    """The requested resource does not exist or does not belong to the current user."""
 
 
 class ConflictError(AppError):
@@ -52,7 +53,7 @@ class ConflictError(AppError):
 
 
 class AuthenticationError(AppError):
-    pass
+    """The client is not authenticated: no token, an invalid token, or wrong credentials."""
 
 
 class ExternalServiceError(AppError):
@@ -60,7 +61,7 @@ class ExternalServiceError(AppError):
 
 
 class ExternalServiceUnavailableError(AppError):
-    """An external service did not answer."""
+    """A service the app depends on (an external API, the database) did not answer."""
 
 
 # Errors
@@ -127,3 +128,10 @@ class ExchangeServiceUnavailableError(ExternalServiceUnavailableError):
 
     def __init__(self) -> None:
         super().__init__("Exchange rate service unavailable")
+
+
+class DatabaseUnavailableError(ExternalServiceUnavailableError):
+    code = ErrorCode.DATABASE_UNAVAILABLE
+
+    def __init__(self) -> None:
+        super().__init__("Database unavailable")

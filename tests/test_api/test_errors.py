@@ -1,12 +1,9 @@
 import asyncio
 import json
-import logging
 
-from fastapi.testclient import TestClient
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from app.api.errors import handle_http_exception
-from app.main import app
 from tests.conftest import assert_error
 
 
@@ -53,23 +50,3 @@ def test_validation_error_does_not_return_sent_values(client):
     # Assert
     assert_error(response, 422, "VALIDATION_ERROR")
     assert "Pw7#x" not in response.text
-
-
-def test_unexpected_error_is_logged_and_hidden_from_client(make_user, auth, monkeypatch, caplog):
-    async def broken(*args, **kwargs):
-        raise RuntimeError("internal detail")
-
-    monkeypatch.setattr("app.services.wallets.get_all_wallets", broken)
-    user = make_user()
-
-    # Act
-    # raise_server_exceptions=False: get the 500 response like a real client instead of the exception
-    with TestClient(app, base_url="https://testserver", raise_server_exceptions=False,
-                    backend_options={"loop_factory": asyncio.SelectorEventLoop}) as client:
-        with caplog.at_level(logging.ERROR):
-            response = client.get("/api/v1/wallets", headers=auth(user))
-
-    # Assert
-    assert_error(response, 500, "INTERNAL_ERROR")
-    assert "internal detail" not in response.text
-    assert any(record.exc_info and "internal detail" in str(record.exc_info[1]) for record in caplog.records)

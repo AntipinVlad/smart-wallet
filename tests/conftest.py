@@ -14,7 +14,8 @@ DATABASE_URL = os.environ.get("TEST_DATABASE_URL", "postgresql+psycopg://wallet@
 os.environ["DATABASE_URL"] = DATABASE_URL
 os.environ["JWT_SECRET_KEY"] = "test-only-secret-key-0123456789-0123456789"
 
-import httpx
+# The HTTP client behind starlette's TestClient: its responses are httpx2.Response
+import httpx2
 import pytest
 from alembic import command
 from alembic.config import Config
@@ -31,6 +32,8 @@ from app.models import Operation, User, Wallet
 from app.main import app
 
 PASSWORD = "correct-password"
+# A request that does not wait for anything answers well within this time
+OTHER_REQUEST_SECONDS = 2
 PASSWORD_HASH = hash_password(PASSWORD)
 
 # Tests prepare and check data with a plain synchronous connection, the app uses its own async one
@@ -54,7 +57,7 @@ class Pause:
         return paused
 
 
-def assert_error(response: httpx.Response, status_code: int, code: str) -> dict[str, Any]:
+def assert_error(response: httpx2.Response, status_code: int, code: str) -> dict[str, Any]:
     """Checks the common error format of the API and returns the error object."""
     assert response.status_code == status_code, response.text
     error = response.json()["error"]
