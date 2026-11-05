@@ -30,8 +30,7 @@ def database_session(client):
 
 
 def test_live_does_not_need_database(client, database_session):
-    # Liveness only says the process answers. If it checked the database, a database outage would make
-    # Kubernetes restart every app container, which does not help and makes the recovery slower
+    # A database outage must not make Kubernetes restart every app container
     database_session(BrokenDatabaseSession())
 
     # Act

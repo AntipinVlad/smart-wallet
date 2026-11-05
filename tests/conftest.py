@@ -11,11 +11,10 @@ from unittest.mock import AsyncMock
 
 DATABASE_URL = os.environ.get("TEST_DATABASE_URL", "postgresql+psycopg://wallet@127.0.0.1:5433/finance_test")
 
-# Must be set before the app is imported, so tests never touch the working database
+# Before the app is imported, so tests never touch the working database
 os.environ["DATABASE_URL"] = DATABASE_URL
 os.environ["JWT_SECRET_KEY"] = "test-only-secret-key-0123456789-0123456789"
 
-# The HTTP client behind starlette's TestClient: its responses are httpx2.Response
 import httpx2
 import pytest
 from alembic.config import Config
@@ -33,18 +32,14 @@ from app.main import app
 from app.models import Operation, User, Wallet
 
 PASSWORD = "correct-password"
-# A request that does not wait for anything answers well within this time
 OTHER_REQUEST_SECONDS = 2
 PASSWORD_HASH = hash_password(PASSWORD)
 
-# Tests prepare and check data with a plain synchronous connection, the app uses its own async one
 sync_engine = create_engine(DATABASE_URL)
 SyncSessionLocal = sessionmaker(bind=sync_engine)
 
 
 class Pause:
-    """Wraps a function so it stops until the test releases it, and tells the test when it got there."""
-
     def __init__(self) -> None:
         self.entered = threading.Event()
         self.released = threading.Event()
@@ -59,7 +54,6 @@ class Pause:
 
 
 def assert_error(response: httpx2.Response, status_code: int, code: str) -> dict[str, Any]:
-    """Checks the common error format of the API and returns the error object."""
     assert response.status_code == status_code, response.text
     error = response.json()["error"]
     assert error["code"] == code
@@ -93,9 +87,8 @@ def clean_tables():
 
 @pytest.fixture()
 def client():
-    # https, because the auth cookies are Secure and are never sent over plain http.
-    # "with" keeps one event loop for the whole test, like uvicorn does, so a blocked loop shows up in tests.
-    # SelectorEventLoop, because async psycopg does not work with the Windows default ProactorEventLoop.
+    # https: the auth cookies are Secure. One loop per test, like uvicorn.
+    # SelectorEventLoop: async psycopg does not work with ProactorEventLoop on Windows
     with TestClient(
         app, base_url="https://testserver", backend_options={"loop_factory": asyncio.SelectorEventLoop}
     ) as test_client:

@@ -90,15 +90,13 @@ async def transfer_between_wallets(
     if not from_wallet or not to_wallet:
         raise WalletNotFoundError()
 
-    # The rate is requested before locking: waiting for an external API while holding the locks
-    # would block every other operation on both wallets
+    # Before locking: waiting for the external API would hold the locks
     target_amount = amount
     if from_wallet.currency != to_wallet.currency:
         exchange_rate = await get_exchange_rate(http_session, from_wallet.currency, to_wallet.currency)
         target_amount = round(amount * exchange_rate, 2)
 
-    # Balances read above may already be outdated. Locking loads the same session objects again
-    # with the current row values, so from_wallet and to_wallet are up to date after this line
+    # Reloads from_wallet and to_wallet with the locked, current balances
     await wallet_repository.get_wallets_by_ids_for_update(db, user_id, [from_wallet.id, to_wallet.id])
 
     if from_wallet.balance < amount:

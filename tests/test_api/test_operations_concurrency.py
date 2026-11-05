@@ -1,10 +1,5 @@
-"""Balance changes racing with a concurrent transaction.
-
-Each test opens its own transaction, locks a wallet row and starts the request in another thread.
-While the row is locked the test changes the balance and commits. A request that locks the wallet
-before reading it waits and sees the new balance. A request that reads without a lock works with
-the old balance and overwrites the concurrent change.
-"""
+# Each test locks a wallet row, starts the request in another thread, then changes the balance and commits.
+# A request that locks before reading sees the new balance; one that does not overwrites the change
 
 from collections.abc import Generator
 from concurrent.futures import Future
@@ -20,7 +15,7 @@ from app.enums import CurrencyEnum
 from app.models import Wallet
 from tests.conftest import OTHER_REQUEST_SECONDS, SyncSessionLocal, assert_error
 
-# How long a request is given to reach the lock. Long enough for a local request, short enough for the suite
+# How long a request is given to reach the lock
 REQUEST_START_SECONDS = 0.5
 REQUEST_FINISH_SECONDS = 10
 
@@ -145,7 +140,7 @@ def test_transfer_keeps_target_balance_changed_concurrently(
 
 
 def test_transfer_locks_wallets_in_id_order(client, make_user, make_wallet, auth, run_in_background):
-    # Opposite transfers A -> B and B -> A deadlock if each one locks its source wallet first
+    # A -> B and B -> A deadlock if each locks its source wallet first
     user = make_user()
     first = make_wallet(user, name="card", balance=Decimal(100))
     second = make_wallet(user, name="cash", balance=Decimal(100))
@@ -169,7 +164,6 @@ def test_transfer_locks_wallets_in_id_order(client, make_user, make_wallet, auth
 def test_transfer_gets_exchange_rate_before_waiting_for_lock(
     client, make_user, make_wallet, auth, mock_exchange_rate, run_in_background
 ):
-    # Waiting for a slow external API while holding the lock would block every other operation on the wallet
     user = make_user()
     source = make_wallet(user, name="card", balance=Decimal(100), currency=CurrencyEnum.USD)
     target = make_wallet(user, name="cash", balance=Decimal(100), currency=CurrencyEnum.UAH)
@@ -194,7 +188,7 @@ def test_transfer_gets_exchange_rate_before_waiting_for_lock(
 def test_transfer_waiting_for_lock_does_not_block_other_requests(
     client, make_user, make_wallet, auth, run_in_background
 ):
-    # One server process serves all requests in one event loop. Waiting for the database must not stop it
+    # All requests share one event loop: waiting for the database must not stop it
     user = make_user()
     source = make_wallet(user, name="card", balance=Decimal(100))
     target = make_wallet(user, name="cash", balance=Decimal(100))

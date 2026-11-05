@@ -8,12 +8,10 @@ from app.schemas import TokenPair
 ACCESS_TOKEN_COOKIE = "access_token"
 REFRESH_TOKEN_COOKIE = "refresh_token"
 ACCESS_TOKEN_COOKIE_PATH = "/"
-# The browser sends the refresh token only to the auth endpoints, not with every API request
+# The refresh token goes only to the auth endpoints, not with every request
 REFRESH_TOKEN_COOKIE_PATH = "/api/v1/auth"
 
 
-# HttpOnly hides the tokens from JavaScript, Secure sends them only over https,
-# SameSite=strict keeps the browser from attaching them to requests made by other sites
 class CookieFlags(TypedDict):
     httponly: bool
     secure: bool

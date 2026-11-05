@@ -23,13 +23,8 @@ async def get_wallet_by_name_for_update(db: AsyncSession, user_id: int, wallet_n
 
 
 async def get_wallets_by_ids_for_update(db: AsyncSession, user_id: int, wallet_ids: list[int]) -> list[Wallet]:
-    # order_by(Wallet.id): rows are always locked in the same order. Without it, transfers A -> B and B -> A
-    # could each lock their source wallet and then wait forever for the other one (a deadlock).
-    #
-    # populate_existing: a transfer first reads the wallets without a lock, so they are already in the session.
-    # By default SQLAlchemy would return those objects with the old balance and ignore the values of the
-    # locked row. populate_existing overwrites them with the current values from the database.
-    # It also overwrites changes that are not flushed yet, so call this before changing the wallets.
+    # order_by(id): always the same lock order, so transfers A -> B and B -> A cannot deadlock.
+    # populate_existing: wallets already in the session get the locked values, unflushed changes are lost
     return list(
         await db.scalars(
             select(Wallet)

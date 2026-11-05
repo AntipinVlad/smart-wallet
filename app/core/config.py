@@ -16,7 +16,6 @@ class Settings(BaseSettings):
     refresh_token_expire_days: int = 7
     health_check_timeout_seconds: float = 2.0
     log_level: LogLevel = "INFO"
-    # text for local development, json for servers where logs are collected
     log_format: LogFormat = "text"
 
 

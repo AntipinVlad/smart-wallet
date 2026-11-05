@@ -13,8 +13,7 @@ logger = logging.getLogger(__name__)
 
 async def check_database(db: AsyncSession) -> None:
     try:
-        # Without a timeout a hanging database would make the check hang too, and the probe would only
-        # see its own timeout instead of a clear 503
+        # Without it a hanging database hangs the probe instead of a clear 503
         async with asyncio.timeout(settings.health_check_timeout_seconds):
             await db.execute(text("SELECT 1"))
     except (SQLAlchemyError, OSError, TimeoutError) as e:

@@ -1,4 +1,3 @@
-# Re-exports, so the rest of the code imports from app.schemas without knowing the file of each schema
 from app.schemas.auth import LoginRequest, TokenPair
 from app.schemas.common import Money
 from app.schemas.error import ErrorBody, ErrorDetail, ErrorResponse

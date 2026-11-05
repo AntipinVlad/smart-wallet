@@ -5,9 +5,6 @@ from app.enums import CurrencyEnum
 
 
 class ErrorCode(StrEnum):
-    """Every error code the API can return. In OpenAPI it is an enum, so a generated client gets a union type."""
-
-    # Raised by the app
     NOT_AUTHENTICATED = "NOT_AUTHENTICATED"
     INVALID_CREDENTIALS = "INVALID_CREDENTIALS"
     INVALID_REFRESH_TOKEN = "INVALID_REFRESH_TOKEN"
@@ -19,7 +16,7 @@ class ErrorCode(StrEnum):
     EXCHANGE_SERVICE_UNAVAILABLE = "EXCHANGE_SERVICE_UNAVAILABLE"
     DATABASE_UNAVAILABLE = "DATABASE_UNAVAILABLE"
 
-    # Set by the error handlers in app/api/errors.py
+    # No error class: set by the handlers in app/api/errors.py
     VALIDATION_ERROR = "VALIDATION_ERROR"
     NOT_FOUND = "NOT_FOUND"
     METHOD_NOT_ALLOWED = "METHOD_NOT_ALLOWED"
@@ -28,11 +25,7 @@ class ErrorCode(StrEnum):
 
 
 class AppError(Exception):
-    """An error the client is allowed to see.
-
-    Services raise these instead of HTTPException, so they do not depend on HTTP. The HTTP status is chosen
-    by the error group in app/api/errors.py. `code` is stable: the frontend checks it, not the message.
-    """
+    """An error the client may see. Services raise it instead of HTTPException, so they do not depend on HTTP."""
 
     code: ErrorCode
 
@@ -62,9 +55,6 @@ class ExternalServiceError(AppError):
 
 class ExternalServiceUnavailableError(AppError):
     """A service the app depends on (an external API, the database) did not answer."""
-
-
-# Errors
 
 
 class NotAuthenticatedError(AuthenticationError):

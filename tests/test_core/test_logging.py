@@ -22,7 +22,7 @@ def request_id():
 
 
 def test_json_formatter_writes_one_json_object_per_record(request_id):
-    # uvicorn adds color_message: a copy of the message with terminal color codes, noise in a log collector
+    # uvicorn adds color_message, a copy with terminal color codes
     record = make_record(user_id=7, color_message="Wallet \x1b[36mcreated\x1b[0m")
 
     # Act
@@ -84,7 +84,6 @@ def test_setup_logging_sets_level_and_silences_uvicorn_access_log():
         # Assert
         assert logging.getLogger().level == logging.WARNING
         assert isinstance(logging.getLogger().handlers[0].formatter, JsonFormatter)
-        # Every request is logged by our middleware, with the request id; the uvicorn access log would repeat it
         assert logging.getLogger("uvicorn.access").disabled
     finally:
         setup_logging(settings.log_level, settings.log_format)

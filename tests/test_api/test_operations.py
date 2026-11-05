@@ -200,7 +200,6 @@ def test_transfer_same_currency(client, db_session, make_user, make_wallet, auth
     )
     assert outgoing["type"] == incoming["type"] == "transfer"
     assert Decimal(outgoing["amount"]) == Decimal(incoming["amount"]) == Decimal(50)
-    # Both sides of one transfer are linked, so the history can show them as one transfer
     assert outgoing["transfer_id"] is not None
     assert outgoing["transfer_id"] == incoming["transfer_id"]
     mock_exchange_rate.assert_not_awaited()

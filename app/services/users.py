@@ -16,7 +16,7 @@ async def create_user(db: AsyncSession, login: str, password: str) -> UserRespon
     if await user_repository.get_user(db, login):
         raise UserAlreadyExistsError()
 
-    # Hashing takes tens of milliseconds of CPU on purpose. In a separate thread it does not stop the event loop
+    # Slow on purpose: in a thread it does not block the event loop
     password_hash = await run_in_threadpool(hash_password, password)
     try:
         user = await user_repository.create_user(db, login, password_hash)

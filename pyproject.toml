@@ -41,19 +41,18 @@ select = [
     "RUF",      # ruff-specific rules
 ]
 ignore = [
-    # Hardcoded passwords: the rule looks only at names, so every constant with "token" or "password" in the name
-    # is reported (cookie names, error codes). Secrets come from environment variables through Settings
+    # Hardcoded passwords: matches only names, so every "token" constant is reported. Secrets come from env
     "S105", "S106",
 ]
 
 [tool.ruff.lint.flake8-bugbear]
-# FastAPI reads Depends() and Query() in default arguments by design, they are not mutable defaults
+# FastAPI reads Depends() and Query() from default arguments by design
 extend-immutable-calls = ["fastapi.Depends", "fastapi.Query"]
 
 [tool.ruff.lint.per-file-ignores]
 # assert is how pytest checks results
 "tests/**" = ["S101"]
-# conftest sets the environment variables before the app is imported
+# conftest sets environment variables before importing the app
 "tests/conftest.py" = ["E402"]
 
 [tool.mypy]
