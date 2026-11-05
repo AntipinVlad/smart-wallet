@@ -54,7 +54,7 @@ def test_create_wallet_name_taken(client, make_user, make_wallet, auth, monkeypa
     user = make_user()
     make_wallet(user, name="card")
     if concurrent:
-        # Another request created the wallet after the check: only the unique constraint in the database stops it
+        # Another request created the wallet after the check: only the unique constraint stops it
         monkeypatch.setattr("app.repository.wallets.is_wallet_exist", AsyncMock(return_value=False))
 
     # Act

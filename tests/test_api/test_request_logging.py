@@ -16,7 +16,7 @@ def access_records(caplog) -> list[logging.LogRecord]:
     "sent_id, kept",
     [
         (None, False),
-        # Usually set by nginx, so the same id is in the logs of nginx and of the app
+        # Usually set by nginx
         ("nginx-4f2a.1", True),
         ("x" * 65, False),
         ("bad id with spaces", False),
@@ -39,7 +39,7 @@ def test_response_has_request_id(client, sent_id, kept):
 def test_every_request_is_logged_once_without_query_string(client, caplog):
     # Act
     with caplog.at_level(logging.INFO, logger=ACCESS_LOGGER):
-        # Query parameters can carry personal data, the path is enough to find the route
+        # The query string can carry personal data
         response = client.get("/api/v1/operations?date_from=2026-01-01")
 
     # Assert
@@ -69,8 +69,7 @@ def test_unexpected_error_is_logged_once_and_hidden_from_client(client, make_use
     user = make_user()
 
     # Act
-    # The default test client re-raises errors that reach the server. A response here means the error was
-    # handled inside the app, so uvicorn does not log the same traceback a second time
+    # TestClient re-raises errors that reach the server: a response means the app handled it, uvicorn logs nothing
     with caplog.at_level(logging.INFO):
         response = client.get("/api/v1/wallets", headers=auth(user))
 

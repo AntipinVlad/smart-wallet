@@ -25,7 +25,7 @@ def refresh_token_of(response) -> str:
 
 
 def with_refresh_token(token: str) -> dict[str, str]:
-    # An explicit Cookie header replaces the client cookie jar, so a test can send any token it holds
+    # An explicit Cookie header replaces the client cookie jar
     return {"Cookie": f"{REFRESH_TOKEN_COOKIE}={token}"}
 
 
@@ -49,7 +49,7 @@ def access_token(user: User, key: str = settings.jwt_secret_key, **claims) -> st
 
 
 def protected_routes() -> list[tuple[str, str]]:
-    # Taken from the app itself, so a new protected route is checked without changing this test
+    # From the app itself, so a new protected route is checked too
     return [
         (method.upper(), path)
         for path, path_item in app.openapi()["paths"].items()
@@ -126,7 +126,6 @@ def test_registered_user_can_login_and_use_cookies(client):
     "cookie, path, max_age",
     [
         (ACCESS_TOKEN_COOKIE, "path=/;", settings.access_token_expire_minutes * 60),
-        # The refresh token is sent only to the auth endpoints, other requests never carry it
         (REFRESH_TOKEN_COOKIE, "path=/api/v1/auth", settings.refresh_token_expire_days * 24 * 60 * 60),
     ],
 )
@@ -150,7 +149,7 @@ def test_login_with_wrong_credentials(client, make_user):
 
     # Assert
     assert_error(wrong_password, 401, "INVALID_CREDENTIALS")
-    # The same answer for both: it must not reveal which logins exist
+    # Must not reveal which logins exist
     assert unknown_user.status_code == wrong_password.status_code
     assert unknown_user.json() == wrong_password.json()
     assert "set-cookie" not in wrong_password.headers
@@ -260,7 +259,6 @@ def test_logout_keeps_other_sessions(client, make_user):
 
 @pytest.mark.parametrize("headers", [{}, with_refresh_token("not_exist")], ids=["without_cookie", "unknown_token"])
 def test_logout_without_valid_token_still_succeeds(client, headers):
-    # Logout must always let the user out, even if the session is already gone
     response = client.post(LOGOUT_URL, headers=headers)
 
     # Assert
@@ -268,7 +266,7 @@ def test_logout_without_valid_token_still_succeeds(client, headers):
 
 
 def test_slow_password_check_does_not_block_other_requests(client, make_user, auth, monkeypatch, run_in_background):
-    # Checking a password takes tens of milliseconds of CPU. In the event loop it would stop every other request
+    # Password checking is CPU-heavy: in the event loop it would stop other requests
     user = make_user()
     pause = Pause()
     monkeypatch.setattr("app.services.auth.verify_password", pause.wrap(verify_password))

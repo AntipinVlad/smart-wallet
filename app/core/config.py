@@ -15,8 +15,9 @@ class Settings(BaseSettings):
     access_token_expire_minutes: int = 30
     refresh_token_expire_days: int = 7
     health_check_timeout_seconds: float = 2.0
+    default_page_size: int = Field(default=20, ge=1)
+    max_page_size: int = Field(default=100, ge=1)
     log_level: LogLevel = "INFO"
-    # text for local development, json for servers where logs are collected
     log_format: LogFormat = "text"
 
 

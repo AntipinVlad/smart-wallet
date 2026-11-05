@@ -13,18 +13,14 @@ access_logger = logging.getLogger("app.access")
 logger = logging.getLogger(__name__)
 
 REQUEST_ID_HEADER = "X-Request-ID"
-# An id from the client (usually nginx) is kept only if it is short and safe to write into logs and headers
+# A client id is kept only if it is safe to write into logs and headers
 _VALID_REQUEST_ID = re.compile(r"[A-Za-z0-9._-]{1,64}")
-# Probes from Docker or Kubernetes come every few seconds, logging them would bury the real requests
+# Probes come every few seconds and would bury the real requests
 _NOT_LOGGED_PATH_PREFIX = "/health"
 
 
 class RequestContextMiddleware:
-    """Runs around every request: gives it an id, logs it, and turns an unhandled error into a 500 response.
-
-    A plain ASGI middleware instead of @app.middleware("http"): it does not wrap the response body and
-    works the same for streaming responses.
-    """
+    # Plain ASGI instead of @app.middleware("http"): it does not wrap the response body, streaming works the same
 
     def __init__(self, app: ASGIApp) -> None:
         self.app = app
@@ -51,9 +47,9 @@ class RequestContextMiddleware:
         try:
             await self.app(scope, receive, send_with_request_id)
         except Exception as error:
-            # Handled here and not re-raised: a re-raised error is logged once more by uvicorn
+            # Not re-raised: uvicorn would log it a second time
             if response_started:
-                # Part of the response is already sent, a 500 cannot replace it. Only the server can close it
+                # Part of the response is already sent, a 500 cannot replace it
                 logger.exception("Error after the response started on %s %s", scope["method"], scope["path"])
                 raise
             response = unexpected_error_response(scope["method"], scope["path"], error)

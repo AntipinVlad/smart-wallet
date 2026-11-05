@@ -30,8 +30,7 @@ async def get_total_balance(db: AsyncSession, http_session: aiohttp.ClientSessio
 
 
 async def create_wallet(db: AsyncSession, current_user: User, wallet: CreateWalletRequest) -> WalletResponse:
-    # A failed insert expires every object in the session, current_user too. Reading its attributes afterwards
-    # would need a new query, which async SQLAlchemy does not run implicitly, so the id is kept here
+    # A failed insert expires current_user, and async code cannot reload it
     user_id = current_user.id
     if await wallet_repository.is_wallet_exist(db, user_id, wallet.name):
         raise WalletAlreadyExistsError(wallet.name)

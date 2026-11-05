@@ -5,17 +5,15 @@ on:
   push:
     branches: [main]
 
-# The workflow only reads the code
 permissions:
   contents: read
 
-# A new push to the same branch cancels the run that is still going for the old commit
+# A new push cancels the run for the old commit
 concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
-  # Runs in parallel with tests and needs no database, so a style or type error is reported within seconds
   lint:
     runs-on: ubuntu-latest
     timeout-minutes: 5
@@ -73,7 +71,7 @@ jobs:
           python-version: "3.12"
           enable-cache: true
 
-      # --locked: fail if uv.lock does not match pyproject.toml instead of silently updating it
+      # --locked: fail if uv.lock is out of date instead of updating it
       - name: Install dependencies
         run: uv sync --locked
 

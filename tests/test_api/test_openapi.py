@@ -88,7 +88,6 @@ def test_every_error_has_status_and_code_from_enum():
     errors = concrete_errors()
 
     # Act
-    # status_code_for raises TypeError for an error that belongs to no group
     statuses = [status_code_for(error_type) for error_type in errors]
 
     # Assert

@@ -17,12 +17,11 @@ from app.repository import users as users_repository
 
 logger = logging.getLogger(__name__)
 
-# auto_error=False: a missing cookie gets the same 401 as an invalid token, instead of FastAPI's default error
+# auto_error=False: a missing cookie gets our 401, not FastAPI's default error
 access_token_cookie = APIKeyCookie(name=ACCESS_TOKEN_COOKIE, auto_error=False)
 
 
 class AppState(TypedDict):
-    # Created once in lifespan. Starlette copies these values into request.state of every request
     http_session: aiohttp.ClientSession
 
 

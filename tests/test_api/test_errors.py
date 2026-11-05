@@ -44,7 +44,7 @@ def test_validation_error_lists_invalid_fields(client):
 
 def test_validation_error_does_not_return_sent_values(client):
     # Act
-    # Pydantic puts the sent value into its errors. A rejected password must not come back in the response
+    # Pydantic puts the sent value into its errors
     response = client.post("/api/v1/users", json={"login": "new_user", "password": "Pw7#x"})
 
     # Assert

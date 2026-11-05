@@ -40,7 +40,7 @@ def test_create_user_rejects_invalid_request(client, payload):
 def test_create_user_login_taken(client, make_user, monkeypatch, concurrent):
     make_user(login="user")
     if concurrent:
-        # Another request registered the login after the check: only the unique constraint in the database stops it
+        # Another request took the login after the check: only the unique constraint stops it
         monkeypatch.setattr("app.repository.users.get_user", AsyncMock(return_value=None))
 
     # Act
@@ -62,7 +62,7 @@ def test_get_me(client, make_user, auth):
 
 
 def test_slow_password_hashing_does_not_block_other_requests(client, make_user, auth, monkeypatch, run_in_background):
-    # Hashing a password takes tens of milliseconds of CPU. In the event loop it would stop every other request
+    # Hashing is CPU-heavy: in the event loop it would stop other requests
     user = make_user()
     pause = Pause()
     monkeypatch.setattr("app.services.users.hash_password", pause.wrap(hash_password))

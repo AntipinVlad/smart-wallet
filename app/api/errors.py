@@ -21,8 +21,6 @@ from app.schemas import ErrorResponse
 
 logger = logging.getLogger(__name__)
 
-# Every error response of the API has the same body:
-# {"error": {"code": "WALLET_NOT_FOUND", "message": "...", "details": [...]}}, details only for validation
 
 STATUS_BY_ERROR_GROUP: dict[type[AppError], int] = {
     NotFoundError: 404,
@@ -58,7 +56,6 @@ async def handle_app_error(_: Request, error: AppError) -> JSONResponse:
 
 
 async def handle_http_exception(_: Request, error: StarletteHTTPException) -> JSONResponse:
-    # Raised by FastAPI itself: unknown route, wrong method and so on
     status = HTTPStatus(error.status_code)
     code = ErrorCode(status.name) if status.name in ErrorCode.__members__ else ErrorCode.HTTP_ERROR
     message = error.detail if isinstance(error.detail, str) else status.phrase
@@ -66,7 +63,7 @@ async def handle_http_exception(_: Request, error: StarletteHTTPException) -> JS
 
 
 async def handle_validation_error(_: Request, error: RequestValidationError) -> JSONResponse:
-    # Only the field and the reason. Pydantic also adds the sent value, which can be a password
+    # Without the input values: they can contain a password
     details = [
         {"field": ".".join(str(part) for part in item["loc"]), "message": item["msg"]} for item in error.errors()
     ]
@@ -74,19 +71,17 @@ async def handle_validation_error(_: Request, error: RequestValidationError) -> 
 
 
 def unexpected_error_response(method: str, path: str, error: Exception) -> JSONResponse:
-    # Called by RequestContextMiddleware for any error no handler above took.
-    # The client gets no details: they can contain SQL, file paths or data of other users
+    # No details for the client: they can contain SQL, file paths or data of other users
     logger.error("Unhandled error on %s %s", method, path, exc_info=error)
     return error_response(500, ErrorCode.INTERNAL_ERROR, "Internal server error")
 
 
 def register_exception_handlers(app: FastAPI) -> None:
-    # Starlette types a handler as accepting any Exception, so a handler for one exception type does not match.
-    # It is called only for the registered type
+    # Starlette types a handler as taking any Exception, a handler for one type does not match it
     app.add_exception_handler(AppError, handle_app_error)  # type: ignore[arg-type]
     app.add_exception_handler(StarletteHTTPException, handle_http_exception)  # type: ignore[arg-type]
     app.add_exception_handler(RequestValidationError, handle_validation_error)  # type: ignore[arg-type]
-    # Unhandled errors are turned into 500 by RequestContextMiddleware, see unexpected_error_response
+    # No Exception handler: RequestContextMiddleware turns unhandled errors into a 500
 
 
 def _documented_response(status_code: int, codes: list[ErrorCode]) -> dict[str, Any]:
@@ -94,10 +89,7 @@ def _documented_response(status_code: int, codes: list[ErrorCode]) -> dict[str, 
 
 
 def error_responses(*error_types: type[AppError], validation: bool = False) -> dict[int | str, dict[str, Any]]:
-    """The `responses` of a route: every listed error under its status.
-
-    validation=True replaces the default FastAPI 422 description, which has another body format.
-    """
+    # validation=True replaces FastAPI's default 422 description, which has another body format
     codes_by_status: dict[int, list[ErrorCode]] = {}
     for error_type in error_types:
         codes_by_status.setdefault(status_code_for(error_type), []).append(error_type.code)
@@ -108,7 +100,6 @@ def error_responses(*error_types: type[AppError], validation: bool = False) -> d
     }
 
 
-# Added to every route in main.py
 INTERNAL_ERROR_RESPONSES: dict[int | str, dict[str, Any]] = {
     500: _documented_response(500, [ErrorCode.INTERNAL_ERROR]),
 }

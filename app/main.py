@@ -16,17 +16,17 @@ from app.core.config import settings
 from app.core.logging import setup_logging
 from app.database import engine
 
-# Before anything logs. Also replaces the logging setup of uvicorn, so all logs have one format
+# Before anything logs
 setup_logging(settings.log_level, settings.log_format)
 
 
 @asynccontextmanager
 async def lifespan(_: FastAPI) -> AsyncIterator[AppState]:
-    # One HTTP session for the whole app: it keeps connections to external APIs open between requests
+    # One session for the app: connections stay open between requests
     timeout = aiohttp.ClientTimeout(total=settings.exchange_api_timeout_seconds)
     async with aiohttp.ClientSession(timeout=timeout) as http_session:
         yield AppState(http_session=http_session)
-    # Database connections belong to the event loop that opened them, so they are closed together with it
+    # Database connections belong to this event loop, so they are closed before it stops
     await engine.dispose()
 
 

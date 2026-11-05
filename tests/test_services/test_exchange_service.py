@@ -27,7 +27,7 @@ class FakeResponse:
 
 
 class FakeSession:
-    # No __aenter__/__aexit__: the session is shared by the whole app, the service must not open or close it
+    # No __aenter__/__aexit__: the shared session must not be opened or closed by the service
     def __init__(self, data: dict | None = None):
         self.data = data
         self.urls = []

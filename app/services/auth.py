@@ -22,7 +22,7 @@ logger = logging.getLogger(__name__)
 
 async def login(db: AsyncSession, user_login: str, password: str) -> TokenPair:
     user = await user_repository.get_user(db, user_login)
-    # Checking takes tens of milliseconds of CPU on purpose. In a separate thread it does not stop the event loop
+    # Slow on purpose: in a thread it does not block the event loop
     is_password_valid = await run_in_threadpool(
         verify_password, password, user.password_hash if user else DUMMY_PASSWORD_HASH
     )
@@ -43,7 +43,7 @@ async def refresh_tokens(db: AsyncSession, refresh_token: str) -> TokenPair:
 
     now = datetime.now(UTC)
     if stored_token.revoked_at:
-        # A revoked token coming back means it may have been stolen, so every session of the user ends
+        # A reused revoked token may be stolen: end every session of the user
         logger.warning("Revoked refresh token reused, ending all sessions of user %s", stored_token.user_id)
         await refresh_token_repository.revoke_all_user_tokens(db, stored_token.user_id, now)
         await db.commit()
