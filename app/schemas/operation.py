@@ -1,10 +1,12 @@
 from datetime import datetime
 from decimal import Decimal
+from enum import StrEnum
 
-from pydantic import BaseModel, Field, ValidationInfo, field_validator
+from pydantic import AwareDatetime, BaseModel, Field, ValidationInfo, field_validator
 
 from app.enums import CurrencyEnum
 from app.schemas.common import Money
+from app.schemas.pagination import PageParams, sort_pattern
 
 
 class OperationRequest(BaseModel):
@@ -40,6 +42,23 @@ class OperationResponse(BaseModel):
     transfer_id: str | None
     created_at: datetime
     description: str | None
+
+
+class OperationSortField(StrEnum):
+    CREATED_AT = "created_at"
+    AMOUNT = "amount"
+
+
+class OperationListQuery(PageParams):
+    sort: str = Field(
+        "created_at,desc",
+        pattern=sort_pattern(OperationSortField),
+        description="field,asc or field,desc. Fields: " + ", ".join(OperationSortField),
+    )
+    wallet_id: int | None = None
+    # A time zone is required: a naive time is ambiguous
+    date_from: AwareDatetime | None = None
+    date_to: AwareDatetime | None = None
 
 
 class TransferRequest(BaseModel):

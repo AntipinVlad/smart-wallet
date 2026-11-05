@@ -3,7 +3,7 @@ import os
 import threading
 from collections.abc import Callable, Generator
 from concurrent.futures import Future, ThreadPoolExecutor
-from datetime import datetime
+from datetime import UTC, datetime
 from decimal import Decimal
 from pathlib import Path
 from typing import Any
@@ -137,7 +137,7 @@ def make_wallet(db_session) -> Callable[..., Wallet]:
 @pytest.fixture()
 def make_operation(db_session) -> Callable[..., Operation]:
     def _make_operation(
-        wallet: Wallet, amount: Decimal = Decimal(50), created_at: datetime = datetime(2026, 1, 15)
+        wallet: Wallet, amount: Decimal = Decimal(50), created_at: datetime = datetime(2026, 1, 15, tzinfo=UTC)
     ) -> Operation:
         operation = Operation(
             wallet_id=wallet.id,

@@ -1,5 +1,3 @@
-from datetime import datetime
-from decimal import Decimal
 from uuid import uuid4
 
 import aiohttp
@@ -10,7 +8,8 @@ from app.enums import OperationType
 from app.models import User
 from app.repository import operations as operations_repository
 from app.repository import wallets as wallet_repository
-from app.schemas import OperationRequest, OperationResponse
+from app.repository.pagination import paginate
+from app.schemas import OperationListQuery, OperationRequest, OperationResponse, Page, TransferRequest
 from app.services.exchange_service import get_exchange_rate
 
 
@@ -55,61 +54,52 @@ async def add_expense(db: AsyncSession, current_user: User, operation: Operation
     return OperationResponse.model_validate(created)
 
 
-async def get_operations_list(
-    db: AsyncSession,
-    current_user: User,
-    wallet_id: int | None = None,
-    date_from: datetime | None = None,
-    date_to: datetime | None = None,
-) -> list[OperationResponse]:
-    if wallet_id:
-        wallet = await wallet_repository.get_wallet_by_id(db, current_user.id, wallet_id)
+async def get_operations_page(
+    db: AsyncSession, current_user: User, query: OperationListQuery
+) -> Page[OperationResponse]:
+    if query.wallet_id:
+        wallet = await wallet_repository.get_wallet_by_id(db, current_user.id, query.wallet_id)
         if not wallet:
-            raise WalletNotFoundError(wallet_id)
+            raise WalletNotFoundError(query.wallet_id)
 
         wallets_ids = [wallet.id]
     else:
         wallets = await wallet_repository.get_all_wallets(db, current_user.id)
         wallets_ids = [wallet.id for wallet in wallets]
 
-    operations = await operations_repository.get_operations_list(db, wallets_ids, date_from, date_to)
-    return [OperationResponse.model_validate(operation) for operation in operations]
+    operations = operations_repository.operations_query(wallets_ids, query.sort, query.date_from, query.date_to)
+    return await paginate(db, operations, query, OperationResponse.model_validate)
 
 
 async def transfer_between_wallets(
-    db: AsyncSession,
-    http_session: aiohttp.ClientSession,
-    user_id: int,
-    from_wallet_id: int,
-    to_wallet_id: int,
-    amount: Decimal,
+    db: AsyncSession, http_session: aiohttp.ClientSession, current_user: User, transfer: TransferRequest
 ) -> list[OperationResponse]:
-    from_wallet = await wallet_repository.get_wallet_by_id(db, user_id, from_wallet_id)
-    to_wallet = await wallet_repository.get_wallet_by_id(db, user_id, to_wallet_id)
+    from_wallet = await wallet_repository.get_wallet_by_id(db, current_user.id, transfer.from_wallet_id)
+    to_wallet = await wallet_repository.get_wallet_by_id(db, current_user.id, transfer.to_wallet_id)
 
     if not from_wallet or not to_wallet:
         raise WalletNotFoundError()
 
     # Before locking: waiting for the external API would hold the locks
-    target_amount = amount
+    target_amount = transfer.amount
     if from_wallet.currency != to_wallet.currency:
         exchange_rate = await get_exchange_rate(http_session, from_wallet.currency, to_wallet.currency)
-        target_amount = round(amount * exchange_rate, 2)
+        target_amount = round(transfer.amount * exchange_rate, 2)
 
     # Reloads from_wallet and to_wallet with the locked, current balances
-    await wallet_repository.get_wallets_by_ids_for_update(db, user_id, [from_wallet.id, to_wallet.id])
+    await wallet_repository.get_wallets_by_ids_for_update(db, current_user.id, [from_wallet.id, to_wallet.id])
 
-    if from_wallet.balance < amount:
+    if from_wallet.balance < transfer.amount:
         raise InsufficientFundsError(from_wallet.balance, from_wallet.currency)
 
-    from_wallet.balance = round(from_wallet.balance - amount, 2)
+    from_wallet.balance = round(from_wallet.balance - transfer.amount, 2)
     to_wallet.balance = round(to_wallet.balance + target_amount, 2)
     transfer_id = str(uuid4())
     outgoing = await operations_repository.create_operation(
         db=db,
         wallet_id=from_wallet.id,
         type=OperationType.TRANSFER,
-        amount=amount,
+        amount=transfer.amount,
         currency=from_wallet.currency,
         category="transfer",
         subcategory="outgoing",

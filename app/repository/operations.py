@@ -1,11 +1,12 @@
 from datetime import datetime
 from decimal import Decimal
 
-from sqlalchemy import select
+from sqlalchemy import Select, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.enums import CurrencyEnum
 from app.models import Operation
+from app.repository.pagination import apply_sort
 
 
 async def create_operation(
@@ -34,9 +35,12 @@ async def create_operation(
     return operation
 
 
-async def get_operations_list(
-    db: AsyncSession, wallets_ids: list[int], date_from: datetime | None = None, date_to: datetime | None = None
-) -> list[Operation]:
+SORT_COLUMNS = {"created_at": Operation.created_at, "amount": Operation.amount}
+
+
+def operations_query(
+    wallets_ids: list[int], sort: str, date_from: datetime | None = None, date_to: datetime | None = None
+) -> Select[Operation]:
     query = select(Operation).where(Operation.wallet_id.in_(wallets_ids))
 
     if date_from:
@@ -45,4 +49,4 @@ async def get_operations_list(
     if date_to:
         query = query.where(Operation.created_at <= date_to)
 
-    return list(await db.scalars(query))
+    return apply_sort(query, sort, SORT_COLUMNS, tiebreaker=Operation.id)

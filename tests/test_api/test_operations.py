@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import UTC, datetime
 from decimal import Decimal
 
 import pytest
@@ -25,6 +25,7 @@ def transfer(client, auth, user, from_wallet_id: int, to_wallet_id: int, amount:
 def test_add_income(client, db_session, make_user, make_wallet, auth):
     user = make_user()
     wallet = make_wallet(user, balance=Decimal(200))
+    started = datetime.now(UTC)
 
     # Act
     response = add_operation(client, auth, user, "income", description="Salary")
@@ -38,6 +39,7 @@ def test_add_income(client, db_session, make_user, make_wallet, auth):
     assert operation["currency"] == "uah"
     assert operation["description"] == "Salary"
     assert operation["transfer_id"] is None
+    assert started <= datetime.fromisoformat(operation["created_at"]) <= datetime.now(UTC)
     db_session.refresh(wallet)
     assert wallet.balance == Decimal(250)
 
@@ -129,7 +131,7 @@ def test_get_operations_for_all_own_wallets(client, make_user, make_wallet, make
 
     # Assert
     assert response.status_code == 200
-    assert {operation["id"] for operation in response.json()} == {first.id, second.id}
+    assert {operation["id"] for operation in response.json()["items"]} == {first.id, second.id}
 
 
 def test_get_operations_by_wallet(client, make_user, make_wallet, make_operation, auth):
@@ -143,7 +145,7 @@ def test_get_operations_by_wallet(client, make_user, make_wallet, make_operation
 
     # Assert
     assert response.status_code == 200
-    assert [item["id"] for item in response.json()] == [operation.id]
+    assert [item["id"] for item in response.json()["items"]] == [operation.id]
 
 
 @pytest.mark.parametrize("wallet_owner", [None, "other"], ids=["missing_wallet", "wallet_of_other_user"])
@@ -161,20 +163,132 @@ def test_get_operations_by_unavailable_wallet(client, make_user, make_wallet, au
 def test_get_operations_by_date_range(client, make_user, make_wallet, make_operation, auth):
     user = make_user()
     wallet = make_wallet(user)
-    make_operation(wallet, created_at=datetime(2026, 1, 1))
-    inside = make_operation(wallet, created_at=datetime(2026, 1, 15))
-    make_operation(wallet, created_at=datetime(2026, 2, 1))
+    make_operation(wallet, created_at=datetime(2026, 1, 1, tzinfo=UTC))
+    inside = make_operation(wallet, created_at=datetime(2026, 1, 15, tzinfo=UTC))
+    make_operation(wallet, created_at=datetime(2026, 2, 1, tzinfo=UTC))
 
     # Act
     response = client.get(
         "/api/v1/operations",
-        params={"date_from": "2026-01-10T00:00:00", "date_to": "2026-01-20T00:00:00"},
+        params={"date_from": "2026-01-10T00:00:00Z", "date_to": "2026-01-20T00:00:00Z"},
         headers=auth(user),
     )
 
     # Assert
     assert response.status_code == 200
-    assert [item["id"] for item in response.json()] == [inside.id]
+    assert [item["id"] for item in response.json()["items"]] == [inside.id]
+
+
+def day(day_of_january: int) -> datetime:
+    return datetime(2026, 1, day_of_january, tzinfo=UTC)
+
+
+def get_operations(client, auth, user, **params):
+    return client.get("/api/v1/operations", params=params, headers=auth(user))
+
+
+def page_info(page: dict) -> dict:
+    return {key: page[key] for key in ("page", "size", "total", "pages")}
+
+
+def test_get_operations_by_pages_newest_first(client, make_user, make_wallet, make_operation, auth):
+    user = make_user()
+    wallet = make_wallet(user)
+    oldest = make_operation(wallet, created_at=day(1))
+    # The same time: the id decides the order
+    same_time_first = make_operation(wallet, created_at=day(15))
+    same_time_second = make_operation(wallet, created_at=day(15))
+    newest = make_operation(wallet, created_at=day(31))
+
+    # Act
+    first = get_operations(client, auth, user, size=3).json()
+    second = get_operations(client, auth, user, size=3, page=2).json()
+
+    # Assert
+    assert [item["id"] for item in first["items"]] == [newest.id, same_time_second.id, same_time_first.id]
+    assert [item["id"] for item in second["items"]] == [oldest.id]
+    assert page_info(first) == {"page": 1, "size": 3, "total": 4, "pages": 2}
+    assert page_info(second) == {"page": 2, "size": 3, "total": 4, "pages": 2}
+
+
+@pytest.mark.parametrize(
+    "sort, expected",
+    [
+        ("created_at,asc", ["small_old", "big_middle", "middle_new"]),
+        ("created_at,desc", ["middle_new", "big_middle", "small_old"]),
+        ("amount,asc", ["small_old", "middle_new", "big_middle"]),
+        ("amount,desc", ["big_middle", "middle_new", "small_old"]),
+        # Without a direction: ascending
+        ("amount", ["small_old", "middle_new", "big_middle"]),
+    ],
+)
+def test_get_operations_sorted(client, make_user, make_wallet, make_operation, auth, sort, expected):
+    user = make_user()
+    wallet = make_wallet(user)
+    operations = {
+        "small_old": make_operation(wallet, amount=Decimal(10), created_at=day(1)),
+        "big_middle": make_operation(wallet, amount=Decimal(300), created_at=day(15)),
+        "middle_new": make_operation(wallet, amount=Decimal(50), created_at=day(31)),
+    }
+
+    # Act
+    response = get_operations(client, auth, user, sort=sort)
+
+    # Assert
+    assert response.status_code == 200
+    assert [item["id"] for item in response.json()["items"]] == [operations[name].id for name in expected]
+
+
+def test_page_after_the_last_one_is_empty(client, make_user, make_wallet, make_operation, auth):
+    user = make_user()
+    make_operation(make_wallet(user))
+
+    # Act
+    response = get_operations(client, auth, user, page=5)
+
+    # Assert
+    assert response.status_code == 200
+    assert response.json()["items"] == []
+    assert response.json()["total"] == 1
+
+
+def test_get_operations_without_operations(client, make_user, auth):
+    user = make_user()
+
+    # Act
+    response = get_operations(client, auth, user)
+
+    # Assert
+    assert response.json() == {"items": [], "page": 1, "size": 20, "total": 0, "pages": 0}
+
+
+@pytest.mark.parametrize(
+    "params",
+    [
+        {"page": 0},
+        {"size": 0},
+        {"size": 101},
+        {"sort": "id,desc"},
+        {"sort": "amount,down"},
+        {"date_from": "2026-01-10T00:00:00"},
+    ],
+    ids=[
+        "page_too_small",
+        "size_too_small",
+        "size_too_large",
+        "sort_by_unknown_field",
+        "sort_in_unknown_direction",
+        "date_without_timezone",
+    ],
+)
+def test_get_operations_with_invalid_params(client, make_user, auth, params):
+    user = make_user()
+
+    # Act
+    response = get_operations(client, auth, user, **params)
+
+    # Assert
+    assert_error(response, 422, "VALIDATION_ERROR")
 
 
 def test_transfer_same_currency(client, db_session, make_user, make_wallet, auth, mock_exchange_rate):
@@ -240,7 +354,7 @@ def test_transfer_exchange_rate_not_found_changes_nothing(
 
     # Assert
     assert_error(response, 502, "EXCHANGE_RATE_NOT_FOUND")
-    assert client.get("/api/v1/operations", headers=auth(user)).json() == []
+    assert client.get("/api/v1/operations", headers=auth(user)).json()["items"] == []
     db_session.refresh(source)
     db_session.refresh(target)
     assert (source.balance, target.balance) == (Decimal(200), Decimal(10))

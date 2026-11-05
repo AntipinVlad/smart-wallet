@@ -1,4 +1,4 @@
-from datetime import datetime
+from typing import Annotated
 
 import aiohttp
 from fastapi import APIRouter, Depends, Query
@@ -14,7 +14,7 @@ from app.core.exceptions import (
     WalletNotFoundError,
 )
 from app.models import User
-from app.schemas import OperationRequest, OperationResponse, TransferRequest
+from app.schemas import OperationListQuery, OperationRequest, OperationResponse, Page, TransferRequest
 from app.services import operation as operation_service
 
 router = APIRouter()
@@ -44,17 +44,15 @@ async def add_expense(
 
 @router.get(
     "/operations",
-    response_model=list[OperationResponse],
+    response_model=Page[OperationResponse],
     responses=error_responses(NotAuthenticatedError, WalletNotFoundError, validation=True),
 )
 async def get_operations(
-    wallet_id: int | None = Query(None),
-    date_from: datetime | None = Query(None),
-    date_to: datetime | None = Query(None),
+    query: Annotated[OperationListQuery, Query()],
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
-) -> list[OperationResponse]:
-    return await operation_service.get_operations_list(db, current_user, wallet_id, date_from, date_to)
+) -> Page[OperationResponse]:
+    return await operation_service.get_operations_page(db, current_user, query)
 
 
 @router.post(
@@ -75,6 +73,4 @@ async def create_transfer(
     http_session: aiohttp.ClientSession = Depends(get_http_session),
     current_user: User = Depends(get_current_user),
 ) -> list[OperationResponse]:
-    return await operation_service.transfer_between_wallets(
-        db, http_session, current_user.id, payload.from_wallet_id, payload.to_wallet_id, payload.amount
-    )
+    return await operation_service.transfer_between_wallets(db, http_session, current_user, payload)
