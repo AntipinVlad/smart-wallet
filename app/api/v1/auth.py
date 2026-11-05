@@ -4,7 +4,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.cookies import RefreshTokenCookie, delete_auth_cookies, set_auth_cookies
 from app.api.errors import error_responses
 from app.core.exceptions import InvalidCredentialsError, InvalidRefreshTokenError
-from app.dependency import get_db
+from app.api.deps import get_db
 from app.schemas import LoginRequest
 from app.services import auth as auth_service
 

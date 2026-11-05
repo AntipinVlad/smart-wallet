@@ -3,7 +3,7 @@ from decimal import Decimal
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.enum import CurrencyEnum
+from app.enums import CurrencyEnum
 from app.models import Wallet
 
 

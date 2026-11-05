@@ -6,7 +6,7 @@ from fastapi.testclient import TestClient
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from app.api.errors import handle_http_exception
-from main import app
+from app.main import app
 from tests.conftest import assert_error
 
 

@@ -12,9 +12,9 @@ from app.core.exceptions import (
     NotAuthenticatedError,
     WalletNotFoundError,
 )
-from app.dependency import get_db, get_current_user, get_http_session
+from app.api.deps import get_db, get_current_user, get_http_session
 from app.models import User
-from app.schemas import OperationRequest, OperationResponse, TransferCreateSchema
+from app.schemas import OperationRequest, OperationResponse, TransferRequest
 from app.services import operation as operation_service
 
 router = APIRouter()
@@ -52,7 +52,7 @@ async def get_operations(
                                        ExchangeRateNotFoundError, ExchangeServiceUnavailableError,
                                        validation=True))
 async def create_transfer(
-        payload: TransferCreateSchema,
+        payload: TransferRequest,
         db: AsyncSession = Depends(get_db),
         http_session: aiohttp.ClientSession = Depends(get_http_session),
         current_user: User = Depends(get_current_user)

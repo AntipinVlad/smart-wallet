@@ -5,7 +5,7 @@ import aiohttp
 
 from app.core.config import settings
 from app.core.exceptions import ExchangeRateNotFoundError, ExchangeServiceUnavailableError
-from app.enum import CurrencyEnum
+from app.enums import CurrencyEnum
 
 logger = logging.getLogger(__name__)
 

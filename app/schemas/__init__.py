@@ -1,0 +1,25 @@
+# Re-exports, so the rest of the code imports from app.schemas without knowing the file of each schema
+from app.schemas.auth import LoginRequest, TokenPair
+from app.schemas.common import Money
+from app.schemas.error import ErrorBody, ErrorDetail, ErrorResponse
+from app.schemas.operation import OperationRequest, OperationResponse, TransferRequest
+from app.schemas.user import UserCreateRequest, UserRequest, UserResponse
+from app.schemas.wallet import CreateWalletRequest, TotalBalance, WalletResponse
+
+__all__ = [
+    "CreateWalletRequest",
+    "ErrorBody",
+    "ErrorDetail",
+    "ErrorResponse",
+    "LoginRequest",
+    "Money",
+    "OperationRequest",
+    "OperationResponse",
+    "TokenPair",
+    "TotalBalance",
+    "TransferRequest",
+    "UserCreateRequest",
+    "UserRequest",
+    "UserResponse",
+    "WalletResponse",
+]
