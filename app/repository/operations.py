@@ -35,6 +35,10 @@ async def create_operation(
     return operation
 
 
+async def get_operation_by_id(db: AsyncSession, operation_id: int) -> Operation | None:
+    return await db.get(Operation, operation_id)
+
+
 SORT_COLUMNS = {"created_at": Operation.created_at, "amount": Operation.amount}
 
 

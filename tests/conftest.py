@@ -16,6 +16,8 @@ REDIS_URL = os.environ.get("TEST_REDIS_URL", "redis://127.0.0.1:6380/0")
 os.environ["DATABASE_URL"] = DATABASE_URL
 os.environ["REDIS_URL"] = REDIS_URL
 os.environ["JWT_SECRET_KEY"] = "test-only-secret-key-0123456789-0123456789"
+# Tests never call OpenAI: every test that needs it gets a fake client
+os.environ["OPENAI_API_KEY"] = "test-only-openai-key"
 
 import httpx2
 import pytest
@@ -147,14 +149,21 @@ def make_wallet(db_session) -> Callable[..., Wallet]:
 @pytest.fixture()
 def make_operation(db_session) -> Callable[..., Operation]:
     def _make_operation(
-        wallet: Wallet, amount: Decimal = Decimal(50), created_at: datetime = datetime(2026, 1, 15, tzinfo=UTC)
+        wallet: Wallet,
+        amount: Decimal = Decimal(50),
+        created_at: datetime = datetime(2026, 1, 15, tzinfo=UTC),
+        type: OperationType = OperationType.EXPENSE,
+        description: str | None = None,
+        category: str | None = None,
     ) -> Operation:
         operation = Operation(
             wallet_id=wallet.id,
-            type=OperationType.EXPENSE,
+            type=type,
             amount=amount,
             currency=wallet.currency,
             created_at=created_at,
+            description=description,
+            category=category,
         )
         db_session.add(operation)
         db_session.commit()

@@ -18,6 +18,7 @@ from app.api.v1.wallets import router as wallet_router
 from app.core.config import settings
 from app.core.logging import setup_logging
 from app.database import engine
+from app.worker import broker as task_broker
 
 # Only in pyproject.toml, bumped with: uv version --bump patch|minor|major
 VERSION = tomllib.loads((Path(__file__).parent.parent / "pyproject.toml").read_text(encoding="utf-8"))["project"][
@@ -40,8 +41,10 @@ async def lifespan(_: FastAPI) -> AsyncIterator[AppState]:
     )
     async with aiohttp.ClientSession(timeout=timeout) as http_session, redis:
         yield AppState(http_session=http_session, redis=redis)
-    # Database connections belong to this event loop, so they are closed before it stops
+    # Database and queue connections belong to this event loop, so they are closed before it stops
     await engine.dispose()
+    # Only the connection pool: startup() is not called, it would make the app fail to start without Redis
+    await task_broker.shutdown()
 
 
 app = FastAPI(title="Smart Wallet", version=VERSION, lifespan=lifespan, responses=INTERNAL_ERROR_RESPONSES)

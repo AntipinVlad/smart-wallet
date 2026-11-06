@@ -11,6 +11,7 @@ from app.repository import wallets as wallet_repository
 from app.repository.pagination import paginate
 from app.schemas import OperationListQuery, OperationRequest, OperationResponse, Page, TransferRequest
 from app.services.exchange_service import get_exchange_rate
+from app.worker import enqueue_categorization
 
 TRANSFER_CATEGORY = "transfer"
 
@@ -30,6 +31,8 @@ async def add_income(db: AsyncSession, current_user: User, operation: OperationR
         description=operation.description,
     )
     await db.commit()
+    # After commit: before it the worker's own connection cannot see the operation yet
+    await enqueue_categorization(created.id)
 
     return OperationResponse.model_validate(created)
 
@@ -52,6 +55,8 @@ async def add_expense(db: AsyncSession, current_user: User, operation: Operation
         description=operation.description,
     )
     await db.commit()
+    # After commit: before it the worker's own connection cannot see the operation yet
+    await enqueue_categorization(created.id)
 
     return OperationResponse.model_validate(created)
 

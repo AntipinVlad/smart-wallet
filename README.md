@@ -2,7 +2,7 @@
 
 A personal finance API built with FastAPI. Users keep wallets in different currencies, record income and expenses, transfer money between their wallets with currency conversion, and browse their operation history.
 
-The next stage is AI features: automatic categorization of operations, semantic search with pgvector, and an assistant that answers questions about your finances.
+New income and expense operations are categorized automatically by an OpenAI model in a background worker. Descriptions can be in English or Ukrainian. Next on the roadmap: semantic search with pgvector, and an assistant that answers questions about your finances.
 
 ## Features
 
@@ -33,6 +33,8 @@ Interactive documentation: <http://localhost:8000/docs> once the app is running.
 | Database | PostgreSQL 17, SQLAlchemy 2.1 (async), psycopg 3, Alembic |
 | Cache and rate limiting | Redis 8, redis-py |
 | Auth | JWT access tokens (PyJWT), rotating refresh tokens, Argon2 password hashes (pwdlib), HttpOnly cookies |
+| AI | OpenAI Python SDK (Responses API, structured outputs) |
+| Background tasks | taskiq with a Redis Streams broker |
 | External APIs | aiohttp |
 | Pagination | fastapi-pagination |
 | Quality | pytest, Ruff, mypy (strict) |
@@ -51,24 +53,33 @@ flowchart LR
         mw --> api --> services --> repo
     end
     pg[("PostgreSQL")]
-    redis[("Redis<br/>login rate limits")]
+    redis[("Redis<br/>login rate limits, task queue")]
     fx["Exchange rate API"]
+    worker["taskiq worker<br/>categorization"]
+    ai["OpenAI"]
 
     client --> mw
     repo --> pg
     services --> redis
     services --> fx
+    redis --> worker
+    worker --> ai
+    worker --> pg
 ```
 
 - **Layers.** Routes only handle HTTP. Services hold the business rules and know nothing about HTTP. Repositories only run queries. Models (`app/models`) describe tables, schemas (`app/schemas`) describe request and response bodies.
 - **Errors.** Services raise their own exceptions. A group of errors maps to one HTTP status, and every error response has the same shape: `{"error": {"code": "...", "message": "..."}}`.
 - **Money.** Balances are `Decimal` and `NUMERIC(18, 2)`. Wallet rows are locked with `SELECT ... FOR UPDATE` in a fixed order, so concurrent operations never lose an update and transfers cannot deadlock. The exchange rate is fetched before the locks are taken.
 - **Rate limiting.** Login attempts are counted in Redis by IP and by IP plus login, in one atomic Lua script. If Redis is down, login still works and the error is logged.
+- **Categorization.** After an income or expense is saved, the API puts a task into a Redis stream and answers at once. A separate worker asks the model for a category with structured outputs: the answer is always one value of a fixed enum such as `food.groceries`, so the model cannot invent a category. Until the worker is done, the operation has `category: null`. If Redis or OpenAI is unavailable, the operation is still saved, it only stays uncategorized.
 - **Observability.** Every response has an `X-Request-ID` header, and every log line of that request carries the same id. Logs are plain text locally and JSON on servers.
 
 ```text
 app/
 ├── main.py          app setup: lifespan, middleware, routers
+├── worker.py        taskiq broker and background tasks
+├── run_worker.py    starts the worker
+├── ai/              AI features, one package per feature (categorization/: categories, prompt, service)
 ├── api/             routes (v1/), dependencies, error handlers, middleware, health checks
 ├── services/        business logic
 ├── repository/      database queries
@@ -76,6 +87,7 @@ app/
 ├── schemas/         Pydantic schemas
 └── core/            settings, exceptions, security, cookies, logging
 alembic/             database migrations
+evals/               categorization examples and a script that measures accuracy
 tests/               API, database, service and config tests
 ```
 
@@ -87,11 +99,18 @@ Requirements: [uv](https://docs.astral.sh/uv/) and Docker.
 cp .env.example .env
 # Set POSTGRES_PASSWORD and JWT_SECRET_KEY in .env, for example with:
 # uv run python -c "import secrets; print(secrets.token_hex(32))"
+# Set OPENAI_API_KEY to a key from https://platform.openai.com/api-keys
 
 uv sync
 docker compose up -d --wait
 uv run alembic upgrade head
 uv run uvicorn app.main:app --reload
+```
+
+In a second terminal, start the worker that categorizes operations:
+
+```bash
+uv run python -m app.run_worker
 ```
 
 Open <http://localhost:8000/docs>.
@@ -107,6 +126,8 @@ Settings are read from environment variables or from `.env`. All of them are lis
 | `DATABASE_URL` | ✓ | PostgreSQL connection string |
 | `REDIS_URL` | ✓ | Redis connection string |
 | `JWT_SECRET_KEY` | ✓ | Secret for signing access tokens, at least 32 characters |
+| `OPENAI_API_KEY` | ✓ | OpenAI API key for categorization |
+| `OPENAI_MODEL` | | `gpt-6-luna` by default |
 | `POSTGRES_USER`, `POSTGRES_PASSWORD`, `POSTGRES_DB` | ✓ | Used by Docker Compose to create the database |
 | `LOG_LEVEL`, `LOG_FORMAT` | | `INFO` and `text` by default. Use `json` on servers |
 
@@ -121,7 +142,13 @@ uv run ruff format .       # format
 uv run mypy                # type check
 ```
 
-Tests run against real PostgreSQL and Redis, not mocks: row locks, constraints and numeric precision are behaviour of the database itself. The schema is built by the Alembic migrations, so the tests also check the migrations.
+Tests run against real PostgreSQL and Redis, not mocks: row locks, constraints and numeric precision are behaviour of the database itself. The schema is built by the Alembic migrations, so the tests also check the migrations. OpenAI is never called from tests: they use a fake client.
+
+Categorization quality is measured separately, against the real model. The script sends about 50 short requests with the key from `.env` and prints how many tokens they used:
+
+```bash
+uv run python -m evals.run_categorization
+```
 
 Database schema changes:
 
