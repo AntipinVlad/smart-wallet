@@ -16,10 +16,8 @@ async def get_all_wallets(db: AsyncSession, user_id: int) -> list[Wallet]:
     return list(await db.scalars(select(Wallet).where(Wallet.user_id == user_id)))
 
 
-async def get_wallet_by_name_for_update(db: AsyncSession, user_id: int, wallet_name: str) -> Wallet | None:
-    return await db.scalar(
-        select(Wallet).where(Wallet.name == wallet_name, Wallet.user_id == user_id).with_for_update()
-    )
+async def get_wallet_by_id_for_update(db: AsyncSession, user_id: int, wallet_id: int) -> Wallet | None:
+    return await db.scalar(select(Wallet).where(Wallet.id == wallet_id, Wallet.user_id == user_id).with_for_update())
 
 
 async def get_wallets_by_ids_for_update(db: AsyncSession, user_id: int, wallet_ids: list[int]) -> list[Wallet]:

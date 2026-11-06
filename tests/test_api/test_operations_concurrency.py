@@ -1,13 +1,14 @@
 # Each test locks a wallet row, starts the request in another thread, then changes the balance and commits.
 # A request that locks before reading sees the new balance; one that does not overwrites the change
 
+import time
 from collections.abc import Generator
 from concurrent.futures import Future
 from contextlib import contextmanager
 from decimal import Decimal
 
 import pytest
-from sqlalchemy import select
+from sqlalchemy import select, text
 from sqlalchemy.exc import OperationalError
 from sqlalchemy.orm import Session
 
@@ -15,8 +16,7 @@ from app.enums import CurrencyEnum
 from app.models import Wallet
 from tests.conftest import OTHER_REQUEST_SECONDS, SyncSessionLocal, assert_error
 
-# How long a request is given to reach the lock
-REQUEST_START_SECONDS = 0.5
+REQUEST_START_SECONDS = 10
 REQUEST_FINISH_SECONDS = 10
 
 
@@ -30,9 +30,24 @@ def locked_wallet(wallet_id: int) -> Generator[Wallet, None, None]:
         db.close()
 
 
-def assert_still_waiting(request: Future) -> None:
-    with pytest.raises(TimeoutError):
-        request.result(timeout=REQUEST_START_SECONDS)
+def wait_until_blocked(request: Future) -> None:
+    # Asks Postgres instead of timing the request: on a slow machine a missing lock cannot look like a wait
+    deadline = time.monotonic() + REQUEST_START_SECONDS
+    with SyncSessionLocal() as db:
+        while not request.done() and time.monotonic() < deadline:
+            waiting = db.scalar(
+                text(
+                    "SELECT count(*) FROM pg_stat_activity "
+                    "WHERE datname = current_database() AND wait_event_type = 'Lock' AND pid <> pg_backend_pid()"
+                )
+            )
+            if waiting:
+                return
+            db.rollback()
+            time.sleep(0.01)
+    if request.done():
+        pytest.fail(f"The request finished without waiting for the lock: {request.result().status_code}")
+    pytest.fail(f"The request did not reach the lock within {REQUEST_START_SECONDS} s")
 
 
 def is_wallet_lock_free(wallet_id: int) -> bool:
@@ -56,14 +71,14 @@ def test_income_is_not_lost_on_concurrent_balance_change(
     # Act
     with locked_wallet(wallet.id) as locked:
         request = run_in_background(
-            client.post, "/api/v1/operations/income", json={"wallet_name": "card", "amount": 50}, headers=auth(user)
+            client.post, "/api/v1/operations/income", json={"wallet_id": wallet.id, "amount": 50}, headers=auth(user)
         )
-        assert_still_waiting(request)
+        wait_until_blocked(request)
         locked.balance = Decimal(150)
     response = request.result(timeout=REQUEST_FINISH_SECONDS)
 
     # Assert
-    assert response.status_code == 200
+    assert response.status_code == 201
     db_session.refresh(wallet)
     assert wallet.balance == Decimal(200)
 
@@ -75,9 +90,9 @@ def test_expense_sees_balance_changed_concurrently(client, db_session, make_user
     # Act
     with locked_wallet(wallet.id) as locked:
         request = run_in_background(
-            client.post, "/api/v1/operations/expense", json={"wallet_name": "card", "amount": 50}, headers=auth(user)
+            client.post, "/api/v1/operations/expense", json={"wallet_id": wallet.id, "amount": 50}, headers=auth(user)
         )
-        assert_still_waiting(request)
+        wait_until_blocked(request)
         locked.balance = Decimal(30)
     response = request.result(timeout=REQUEST_FINISH_SECONDS)
 
@@ -102,7 +117,7 @@ def test_transfer_sees_source_balance_changed_concurrently(
             json={"from_wallet_id": source.id, "to_wallet_id": target.id, "amount": 50},
             headers=auth(user),
         )
-        assert_still_waiting(request)
+        wait_until_blocked(request)
         locked.balance = Decimal(30)
     response = request.result(timeout=REQUEST_FINISH_SECONDS)
 
@@ -129,12 +144,12 @@ def test_transfer_keeps_target_balance_changed_concurrently(
             json={"from_wallet_id": source.id, "to_wallet_id": target.id, "amount": 50},
             headers=auth(user),
         )
-        assert_still_waiting(request)
+        wait_until_blocked(request)
         locked.balance = Decimal(500)
     response = request.result(timeout=REQUEST_FINISH_SECONDS)
 
     # Assert
-    assert response.status_code == 200
+    assert response.status_code == 201
     db_session.refresh(target)
     assert target.balance == Decimal(550)
 
@@ -153,7 +168,7 @@ def test_transfer_locks_wallets_in_id_order(client, make_user, make_wallet, auth
             json={"from_wallet_id": second.id, "to_wallet_id": first.id, "amount": 50},
             headers=auth(user),
         )
-        assert_still_waiting(request)
+        wait_until_blocked(request)
         second_is_free = is_wallet_lock_free(second.id)
     request.result(timeout=REQUEST_FINISH_SECONDS)
 
@@ -176,13 +191,13 @@ def test_transfer_gets_exchange_rate_before_waiting_for_lock(
             json={"from_wallet_id": source.id, "to_wallet_id": target.id, "amount": 50},
             headers=auth(user),
         )
-        assert_still_waiting(request)
+        wait_until_blocked(request)
         rate_requested_while_waiting = mock_exchange_rate.await_count == 1
     response = request.result(timeout=REQUEST_FINISH_SECONDS)
 
     # Assert
     assert rate_requested_while_waiting
-    assert response.status_code == 200
+    assert response.status_code == 201
 
 
 def test_transfer_waiting_for_lock_does_not_block_other_requests(
@@ -201,7 +216,7 @@ def test_transfer_waiting_for_lock_does_not_block_other_requests(
             json={"from_wallet_id": source.id, "to_wallet_id": target.id, "amount": 50},
             headers=auth(user),
         )
-        assert_still_waiting(transfer)
+        wait_until_blocked(transfer)
         other = run_in_background(client.get, "/api/v1/users/me", headers=auth(user))
         other_response = other.result(timeout=OTHER_REQUEST_SECONDS)
     transfer.result(timeout=REQUEST_FINISH_SECONDS)

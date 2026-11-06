@@ -122,6 +122,16 @@ def test_registered_user_can_login_and_use_cookies(client):
     assert me.json()["login"] == "user"
 
 
+def test_login_ignores_case_and_surrounding_spaces(client, make_user):
+    make_user(login="anna")
+
+    # Act
+    response = login(client, user_login=" ANNA ")
+
+    # Assert
+    assert response.status_code == 204
+
+
 @pytest.mark.parametrize(
     "cookie, path, max_age",
     [
