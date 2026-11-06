@@ -8,9 +8,9 @@ from app.enums import CurrencyEnum
 from tests.conftest import assert_error
 
 
-def add_operation(client, auth, user, endpoint: str, **payload):
+def add_operation(client, auth, user, endpoint: str, wallet_id: int, **payload):
     return client.post(
-        f"/api/v1/operations/{endpoint}", json={"wallet_name": "card", "amount": 50} | payload, headers=auth(user)
+        f"/api/v1/operations/{endpoint}", json={"wallet_id": wallet_id, "amount": 50} | payload, headers=auth(user)
     )
 
 
@@ -28,10 +28,10 @@ def test_add_income(client, db_session, make_user, make_wallet, auth):
     started = datetime.now(UTC)
 
     # Act
-    response = add_operation(client, auth, user, "income", description="Salary")
+    response = add_operation(client, auth, user, "income", wallet.id, description="Salary")
 
     # Assert
-    assert response.status_code == 200
+    assert response.status_code == 201
     operation = response.json()
     assert operation["type"] == "income"
     assert operation["wallet_id"] == wallet.id
@@ -52,10 +52,10 @@ def test_add_expense(client, db_session, make_user, make_wallet, auth, amount, b
     wallet = make_wallet(user, balance=Decimal(200))
 
     # Act
-    response = add_operation(client, auth, user, "expense", amount=amount)
+    response = add_operation(client, auth, user, "expense", wallet.id, amount=amount)
 
     # Assert
-    assert response.status_code == 200
+    assert response.status_code == 201
     assert response.json()["type"] == "expense"
     db_session.refresh(wallet)
     assert wallet.balance == balance_after
@@ -66,7 +66,7 @@ def test_add_expense_not_enough_money(client, db_session, make_user, make_wallet
     wallet = make_wallet(user, balance=Decimal(200))
 
     # Act
-    response = add_operation(client, auth, user, "expense", amount=250)
+    response = add_operation(client, auth, user, "expense", wallet.id, amount=250)
 
     # Assert
     assert_error(response, 409, "INSUFFICIENT_FUNDS")
@@ -82,7 +82,7 @@ def test_add_expense_not_enough_money(client, db_session, make_user, make_wallet
         ("income", {"amount": "0.001"}),
         ("expense", {"amount": "12345678901234567.00"}),
         ("income", {"description": "a" * 256}),
-        ("expense", {"wallet_name": " "}),
+        ("expense", {"wallet_id": "card"}),
     ],
     ids=[
         "zero_amount",
@@ -90,15 +90,15 @@ def test_add_expense_not_enough_money(client, db_session, make_user, make_wallet
         "too_many_decimals",
         "too_many_digits",
         "long_description",
-        "empty_wallet_name",
+        "wallet_id_not_a_number",
     ],
 )
 def test_operation_rejects_invalid_request(client, make_user, make_wallet, auth, endpoint, payload):
     user = make_user()
-    make_wallet(user)
+    wallet = make_wallet(user)
 
     # Act
-    response = add_operation(client, auth, user, endpoint, **payload)
+    response = add_operation(client, auth, user, endpoint, **({"wallet_id": wallet.id} | payload))
 
     # Assert
     assert_error(response, 422, "VALIDATION_ERROR")
@@ -111,7 +111,7 @@ def test_operation_on_unavailable_wallet(client, db_session, make_user, make_wal
     wallet = make_wallet(make_user(login=wallet_owner), balance=Decimal(200)) if wallet_owner else None
 
     # Act
-    response = add_operation(client, auth, user, endpoint)
+    response = add_operation(client, auth, user, endpoint, wallet.id if wallet else 999)
 
     # Assert
     assert_error(response, 404, "WALLET_NOT_FOUND")
@@ -145,13 +145,17 @@ def test_get_operations_by_wallet(client, make_user, make_wallet, make_operation
 
     # Assert
     assert response.status_code == 200
-    assert [item["id"] for item in response.json()["items"]] == [operation.id]
+    assert [(item["id"], item["type"]) for item in response.json()["items"]] == [(operation.id, "expense")]
 
 
-@pytest.mark.parametrize("wallet_owner", [None, "other"], ids=["missing_wallet", "wallet_of_other_user"])
-def test_get_operations_by_unavailable_wallet(client, make_user, make_wallet, auth, wallet_owner):
+@pytest.mark.parametrize(
+    "wallet_owner, missing_id",
+    [(None, 999), (None, 0), ("other", None)],
+    ids=["missing_wallet", "zero_id", "wallet_of_other_user"],
+)
+def test_get_operations_by_unavailable_wallet(client, make_user, make_wallet, auth, wallet_owner, missing_id):
     user = make_user(login="user")
-    wallet_id = make_wallet(make_user(login=wallet_owner)).id if wallet_owner else 999
+    wallet_id = make_wallet(make_user(login=wallet_owner)).id if wallet_owner else missing_id
 
     # Act
     response = client.get("/api/v1/operations", params={"wallet_id": wallet_id}, headers=auth(user))
@@ -300,7 +304,7 @@ def test_transfer_same_currency(client, db_session, make_user, make_wallet, auth
     response = transfer(client, auth, user, source.id, target.id, Decimal(50))
 
     # Assert
-    assert response.status_code == 200
+    assert response.status_code == 201
     outgoing, incoming = response.json()
     assert (outgoing["wallet_id"], outgoing["subcategory"], outgoing["description"]) == (
         source.id,
@@ -331,7 +335,7 @@ def test_transfer_converts_currency(client, db_session, make_user, make_wallet, 
     response = transfer(client, auth, user, source.id, target.id, Decimal(50))
 
     # Assert
-    assert response.status_code == 200
+    assert response.status_code == 201
     outgoing, incoming = response.json()
     assert (Decimal(outgoing["amount"]), outgoing["currency"]) == (Decimal(50), "usd")
     assert (Decimal(incoming["amount"]), incoming["currency"]) == (Decimal(2000), "uah")

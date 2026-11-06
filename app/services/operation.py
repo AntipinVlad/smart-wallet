@@ -4,7 +4,7 @@ import aiohttp
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.exceptions import InsufficientFundsError, WalletNotFoundError
-from app.enums import OperationType
+from app.enums import OperationType, TransferDirection
 from app.models import User
 from app.repository import operations as operations_repository
 from app.repository import wallets as wallet_repository
@@ -12,11 +12,13 @@ from app.repository.pagination import paginate
 from app.schemas import OperationListQuery, OperationRequest, OperationResponse, Page, TransferRequest
 from app.services.exchange_service import get_exchange_rate
 
+TRANSFER_CATEGORY = "transfer"
+
 
 async def add_income(db: AsyncSession, current_user: User, operation: OperationRequest) -> OperationResponse:
-    wallet = await wallet_repository.get_wallet_by_name_for_update(db, current_user.id, operation.wallet_name)
+    wallet = await wallet_repository.get_wallet_by_id_for_update(db, current_user.id, operation.wallet_id)
     if not wallet:
-        raise WalletNotFoundError(operation.wallet_name)
+        raise WalletNotFoundError(operation.wallet_id)
 
     wallet.balance += operation.amount
     created = await operations_repository.create_operation(
@@ -33,9 +35,9 @@ async def add_income(db: AsyncSession, current_user: User, operation: OperationR
 
 
 async def add_expense(db: AsyncSession, current_user: User, operation: OperationRequest) -> OperationResponse:
-    wallet = await wallet_repository.get_wallet_by_name_for_update(db, current_user.id, operation.wallet_name)
+    wallet = await wallet_repository.get_wallet_by_id_for_update(db, current_user.id, operation.wallet_id)
     if not wallet:
-        raise WalletNotFoundError(operation.wallet_name)
+        raise WalletNotFoundError(operation.wallet_id)
 
     if wallet.balance < operation.amount:
         raise InsufficientFundsError(wallet.balance, wallet.currency)
@@ -57,17 +59,14 @@ async def add_expense(db: AsyncSession, current_user: User, operation: Operation
 async def get_operations_page(
     db: AsyncSession, current_user: User, query: OperationListQuery
 ) -> Page[OperationResponse]:
-    if query.wallet_id:
-        wallet = await wallet_repository.get_wallet_by_id(db, current_user.id, query.wallet_id)
-        if not wallet:
-            raise WalletNotFoundError(query.wallet_id)
+    if query.wallet_id is not None and not await wallet_repository.get_wallet_by_id(
+        db, current_user.id, query.wallet_id
+    ):
+        raise WalletNotFoundError(query.wallet_id)
 
-        wallets_ids = [wallet.id]
-    else:
-        wallets = await wallet_repository.get_all_wallets(db, current_user.id)
-        wallets_ids = [wallet.id for wallet in wallets]
-
-    operations = operations_repository.operations_query(wallets_ids, query.sort, query.date_from, query.date_to)
+    operations = operations_repository.operations_query(
+        current_user.id, query.sort, query.wallet_id, query.date_from, query.date_to
+    )
     return await paginate(db, operations, query, OperationResponse.model_validate)
 
 
@@ -101,8 +100,8 @@ async def transfer_between_wallets(
         type=OperationType.TRANSFER,
         amount=transfer.amount,
         currency=from_wallet.currency,
-        category="transfer",
-        subcategory="outgoing",
+        category=TRANSFER_CATEGORY,
+        subcategory=TransferDirection.OUTGOING,
         transfer_id=transfer_id,
         description=f"Transfer to {to_wallet.name}",
     )
@@ -112,8 +111,8 @@ async def transfer_between_wallets(
         type=OperationType.TRANSFER,
         amount=target_amount,
         currency=to_wallet.currency,
-        category="transfer",
-        subcategory="incoming",
+        category=TRANSFER_CATEGORY,
+        subcategory=TransferDirection.INCOMING,
         transfer_id=transfer_id,
         description=f"Transfer from {from_wallet.name}",
     )

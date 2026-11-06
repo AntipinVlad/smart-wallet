@@ -19,14 +19,35 @@ def test_create_user(client, db_session):
     assert user.password_hash.startswith("$argon2id$")
 
 
+def test_create_user_stores_login_in_lower_case_without_spaces(client, db_session):
+    # Act
+    response = client.post("/api/v1/users", json={"login": "  Anna ", "password": PASSWORD})
+
+    # Assert
+    assert response.status_code == 201
+    assert response.json()["login"] == "anna"
+    assert db_session.scalars(select(User.login)).one() == "anna"
+
+
+def test_create_user_login_taken_in_other_case(client, make_user):
+    make_user(login="anna")
+
+    # Act
+    response = client.post("/api/v1/users", json={"login": "ANNA", "password": PASSWORD})
+
+    # Assert
+    assert_error(response, 409, "USER_ALREADY_EXISTS")
+
+
 @pytest.mark.parametrize(
     "payload",
     [
         {"login": "user"},
         {"login": "user", "password": "short"},
         {"login": "a" * 128, "password": PASSWORD},
+        {"login": "   ", "password": PASSWORD},
     ],
-    ids=["without_password", "short_password", "long_login"],
+    ids=["without_password", "short_password", "long_login", "blank_login"],
 )
 def test_create_user_rejects_invalid_request(client, payload):
     # Act

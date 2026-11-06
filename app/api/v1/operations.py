@@ -23,6 +23,7 @@ router = APIRouter()
 @router.post(
     "/operations/income",
     response_model=OperationResponse,
+    status_code=201,
     responses=error_responses(NotAuthenticatedError, WalletNotFoundError, validation=True),
 )
 async def add_income(
@@ -34,6 +35,7 @@ async def add_income(
 @router.post(
     "/operations/expense",
     response_model=OperationResponse,
+    status_code=201,
     responses=error_responses(NotAuthenticatedError, WalletNotFoundError, InsufficientFundsError, validation=True),
 )
 async def add_expense(
@@ -58,6 +60,7 @@ async def get_operations(
 @router.post(
     "/operations/transfers",
     response_model=list[OperationResponse],
+    status_code=201,
     responses=error_responses(
         NotAuthenticatedError,
         WalletNotFoundError,

@@ -11,3 +11,8 @@ class OperationType(StrEnum):
     EXPENSE = auto()
     INCOME = auto()
     TRANSFER = auto()
+
+
+class TransferDirection(StrEnum):
+    OUTGOING = auto()
+    INCOMING = auto()
