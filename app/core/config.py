@@ -1,4 +1,4 @@
-from pydantic import Field
+from pydantic import Field, SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 from app.core.logging import LogFormat, LogLevel
@@ -22,6 +22,10 @@ class Settings(BaseSettings):
     login_rate_limit_per_ip: int = Field(default=20, ge=1)
     login_rate_limit_per_login: int = Field(default=5, ge=1)
     login_rate_limit_window_seconds: int = Field(default=60, ge=1)
+    openai_api_key: SecretStr
+    openai_model: str = "gpt-6-luna"
+    # The SDK default is 10 minutes: a hanging request would hold a worker slot that long
+    openai_timeout_seconds: float = Field(default=30.0, gt=0)
     log_level: LogLevel = "INFO"
     log_format: LogFormat = "text"
 

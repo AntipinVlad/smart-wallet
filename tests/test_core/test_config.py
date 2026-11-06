@@ -33,7 +33,7 @@ def test_settings_read_from_env_file(monkeypatch, tmp_path):
     assert settings.database_url == "sqlite:///./from_file.db"
 
 
-@pytest.mark.parametrize("name", ["DATABASE_URL", "JWT_SECRET_KEY", "REDIS_URL"])
+@pytest.mark.parametrize("name", ["DATABASE_URL", "JWT_SECRET_KEY", "REDIS_URL", "OPENAI_API_KEY"])
 def test_settings_require_value(monkeypatch, name):
     monkeypatch.delenv(name)
 
@@ -42,12 +42,22 @@ def test_settings_require_value(monkeypatch, name):
         Settings(_env_file=None)
 
 
+def test_openai_key_is_hidden_when_settings_are_printed():
+    # Act
+    settings = Settings(_env_file=None)
+
+    # Assert
+    assert "test-only-openai-key" not in repr(settings)
+    assert settings.openai_api_key.get_secret_value() == "test-only-openai-key"
+
+
 @pytest.mark.parametrize(
     "name, value",
     [
         ("JWT_SECRET_KEY", "too-short"),
         ("LOG_LEVEL", "VERBOSE"),
         ("LOG_FORMAT", "xml"),
+        ("OPENAI_TIMEOUT_SECONDS", "0"),
     ],
 )
 def test_settings_reject_invalid_value(monkeypatch, name, value):
