@@ -19,6 +19,7 @@ async def create_operation(
     subcategory: str | None = None,
     transfer_id: str | None = None,
     description: str | None = None,
+    created_at: datetime | None = None,
 ) -> Operation:
     operation = Operation(
         wallet_id=wallet_id,
@@ -30,6 +31,9 @@ async def create_operation(
         transfer_id=transfer_id,
         description=description,
     )
+    # Without a date the column default sets the current time
+    if created_at is not None:
+        operation.created_at = created_at
     db.add(operation)
     await db.flush()
     return operation

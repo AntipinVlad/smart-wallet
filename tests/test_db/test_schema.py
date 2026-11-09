@@ -51,6 +51,19 @@ def test_migration_normalizes_logins_and_operation_types(alembic_config):
         assert connection.scalar(text("SELECT type FROM operation")) == "INCOME"
 
 
+def test_migration_sets_utc_timezone_for_existing_users(alembic_config):
+    command.downgrade(alembic_config, "f1996fe0786f")
+    with sync_engine.begin() as connection:
+        connection.execute(text("""INSERT INTO "user" (login, password_hash) VALUES ('anna', 'hash')"""))
+
+    # Act
+    command.upgrade(alembic_config, "head")
+
+    # Assert
+    with sync_engine.connect() as connection:
+        assert connection.scalar(text('SELECT timezone FROM "user"')) == "UTC"
+
+
 @pytest.mark.parametrize("table, column", [("wallet", "balance"), ("operation", "amount")])
 def test_money_columns_have_fixed_precision(table, column):
     # Act

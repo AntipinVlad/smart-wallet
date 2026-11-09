@@ -12,8 +12,8 @@ async def get_user_by_id(db: AsyncSession, user_id: int) -> User | None:
     return await db.get(User, user_id)
 
 
-async def create_user(db: AsyncSession, login: str, password_hash: str) -> User:
-    user = User(login=login, password_hash=password_hash)
+async def create_user(db: AsyncSession, login: str, password_hash: str, timezone: str) -> User:
+    user = User(login=login, password_hash=password_hash, timezone=timezone)
     db.add(user)
     await db.flush()
     return user

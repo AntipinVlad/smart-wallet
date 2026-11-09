@@ -1,11 +1,12 @@
 from datetime import datetime
 from decimal import Decimal
 from enum import StrEnum
+from typing import Annotated, Literal
 
 from pydantic import AwareDatetime, BaseModel, Field, ValidationInfo, field_validator
 
 from app.enums import CurrencyEnum, OperationType
-from app.schemas.common import PositiveMoney
+from app.schemas.common import PastDatetime, PositiveMoney
 from app.schemas.pagination import PageParams, sort_pattern
 
 
@@ -13,6 +14,7 @@ class OperationRequest(BaseModel):
     wallet_id: int
     amount: PositiveMoney
     description: str | None = Field(None, max_length=255)
+    created_at: PastDatetime | None = None
 
 
 class OperationResponse(BaseModel):
@@ -50,6 +52,7 @@ class TransferRequest(BaseModel):
     from_wallet_id: int
     to_wallet_id: int
     amount: PositiveMoney
+    created_at: PastDatetime | None = None
 
     @field_validator("to_wallet_id")
     @classmethod
@@ -57,3 +60,38 @@ class TransferRequest(BaseModel):
         if "from_wallet_id" in info.data and v == info.data["from_wallet_id"]:
             raise ValueError("Wallet id must be different")
         return v
+
+
+class ParseRequest(BaseModel):
+    text: str = Field(min_length=1, max_length=500)
+
+
+class OriginalAmount(BaseModel):
+    amount: Decimal
+    currency: CurrencyEnum
+
+
+class DraftAmount(BaseModel):
+    # In the wallet currency: the confirming endpoint takes the amount as is
+    amount: Decimal
+    # None until the wallet is known
+    currency: CurrencyEnum | None
+    # What the text said, when it was in another currency
+    original: OriginalAmount | None
+    exchange_rate: Decimal | None
+    created_at: datetime
+
+
+class OperationDraft(DraftAmount):
+    type: Literal[OperationType.EXPENSE, OperationType.INCOME]
+    wallet_id: int | None
+    description: str = Field(max_length=255)
+
+
+class TransferDraft(DraftAmount):
+    type: Literal[OperationType.TRANSFER]
+    from_wallet_id: int | None
+    to_wallet_id: int | None
+
+
+Draft = Annotated[OperationDraft | TransferDraft, Field(discriminator="type")]

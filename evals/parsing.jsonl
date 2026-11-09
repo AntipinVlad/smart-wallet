@@ -1,0 +1,43 @@
+{"lang": "uk", "text": "кава 85 грн з монобанку", "expected": [{"tool": "add_expense", "wallet": "Monobank", "amount": "85", "currency": "uah", "days_ago": 0}]}
+{"lang": "uk", "text": "таксі 230 готівкою", "expected": [{"tool": "add_expense", "wallet": "Cash", "amount": "230", "currency": "uah", "days_ago": 0}]}
+{"lang": "en", "text": "lunch 12 dollars cash", "expected": [{"tool": "add_expense", "wallet": "Cash", "amount": "12", "currency": "usd", "days_ago": 0}]}
+{"lang": "uk", "text": "вчора заправка 1500 з монобанку", "expected": [{"tool": "add_expense", "wallet": "Monobank", "amount": "1500", "currency": "uah", "days_ago": 1}]}
+{"lang": "uk", "text": "позавчора аптека 340 грн", "expected": [{"tool": "add_expense", "wallet": null, "amount": "340", "currency": "uah", "days_ago": 2}]}
+{"lang": "uk", "text": "в суботу кіно 400 готівкою", "expected": [{"tool": "add_expense", "wallet": "Cash", "amount": "400", "currency": "uah", "days_ago": 2}]}
+{"lang": "en", "text": "paid rent 15000 uah from monobank on friday", "expected": [{"tool": "add_expense", "wallet": "Monobank", "amount": "15000", "currency": "uah", "days_ago": 3}]}
+{"lang": "uk", "text": "3 листопада стрижка 600 готівкою", "expected": [{"tool": "add_expense", "wallet": "Cash", "amount": "600", "currency": "uah", "days_ago": 6}]}
+{"lang": "uk", "text": "в понеділок обід 250 з монобанку", "expected": [{"tool": "add_expense", "wallet": "Monobank", "amount": "250", "currency": "uah", "days_ago": [0, 7]}]}
+{"lang": "en", "text": "yesterday: uber 9 usd from savings", "expected": [{"tool": "add_expense", "wallet": "Savings", "amount": "9", "currency": "usd", "days_ago": 1}]}
+{"lang": "uk", "text": "таксі 150 з монобанку вчора", "expected": [{"tool": "add_expense", "wallet": "Monobank", "amount": "150", "currency": "uah", "days_ago": 1}]}
+{"lang": "uk", "text": "зарплата 45000 на монобанк", "expected": [{"tool": "add_income", "wallet": "Monobank", "amount": "45000", "currency": "uah", "days_ago": 0}]}
+{"lang": "en", "text": "got 200 dollars freelance payment to savings", "expected": [{"tool": "add_income", "wallet": "Savings", "amount": "200", "currency": "usd", "days_ago": 0}]}
+{"lang": "uk", "text": "повернули борг 500 готівкою", "expected": [{"tool": "add_income", "wallet": "Cash", "amount": "500", "currency": "uah", "days_ago": 0}]}
+{"lang": "uk", "text": "кешбек 120 на монобанк", "expected": [{"tool": "add_income", "wallet": "Monobank", "amount": "120", "currency": "uah", "days_ago": 0}]}
+{"lang": "uk", "text": "отримав 3000 від мами на готівку", "expected": [{"tool": "add_income", "wallet": "Cash", "amount": "3000", "currency": "uah", "days_ago": 0}]}
+{"lang": "uk", "text": "переказав 5000 з монобанку на готівку", "expected": [{"tool": "create_transfer", "from": "Monobank", "to": "Cash", "amount": "5000", "currency": "uah", "days_ago": 0}]}
+{"lang": "en", "text": "moved 100 usd from savings to monobank", "expected": [{"tool": "create_transfer", "from": "Savings", "to": "Monobank", "amount": "100", "currency": "usd", "days_ago": 0}]}
+{"lang": "uk", "text": "поклав 1000 доларів на savings з монобанку", "expected": [{"tool": "create_transfer", "from": "Monobank", "to": "Savings", "amount": "1000", "currency": "usd", "days_ago": 0}]}
+{"lang": "uk", "text": "з savings зняв 50 доларів готівкою", "expected": [{"tool": "create_transfer", "from": "Savings", "to": "Cash", "amount": "50", "currency": "usd", "days_ago": 0}]}
+{"lang": "uk", "text": "переказ 2000", "expected": [{"tool": "create_transfer", "from": null, "to": null, "amount": "2000", "currency": null, "days_ago": 0}]}
+{"lang": "uk", "text": "кава 85 і круасан 60 з монобанку", "expected": [{"tool": "add_expense", "wallet": "Monobank", "amount": "85", "currency": "uah", "days_ago": 0}, {"tool": "add_expense", "wallet": "Monobank", "amount": "60", "currency": "uah", "days_ago": 0}]}
+{"lang": "uk", "text": "зарплата 40000 на монобанк, відразу переказав 10000 на savings", "expected": [{"tool": "add_income", "wallet": "Monobank", "amount": "40000", "currency": "uah", "days_ago": 0}, {"tool": "create_transfer", "from": "Monobank", "to": "Savings", "amount": "10000", "currency": "uah", "days_ago": 0}]}
+{"lang": "en", "text": "groceries 850 and taxi 120, both from monobank", "expected": [{"tool": "add_expense", "wallet": "Monobank", "amount": "850", "currency": "uah", "days_ago": 0}, {"tool": "add_expense", "wallet": "Monobank", "amount": "120", "currency": "uah", "days_ago": 0}]}
+{"lang": "en", "text": "coffee 3.5 and sandwich 6 dollars from savings", "expected": [{"tool": "add_expense", "wallet": "Savings", "amount": "3.5", "currency": "usd", "days_ago": 0}, {"tool": "add_expense", "wallet": "Savings", "amount": "6", "currency": "usd", "days_ago": 0}]}
+{"lang": "uk", "text": "вчора продукти 900 з монобанку, а сьогодні таксі 200 готівкою", "expected": [{"tool": "add_expense", "wallet": "Monobank", "amount": "900", "currency": "uah", "days_ago": 1}, {"tool": "add_expense", "wallet": "Cash", "amount": "200", "currency": "uah", "days_ago": 0}]}
+{"lang": "uk", "text": "двісті гривень на таксі з монобанку", "expected": [{"tool": "add_expense", "wallet": "Monobank", "amount": "200", "currency": "uah", "days_ago": 0}]}
+{"lang": "uk", "text": "півтори тисячі за інтернет з монобанку", "expected": [{"tool": "add_expense", "wallet": "Monobank", "amount": "1500", "currency": "uah", "days_ago": 0}]}
+{"lang": "uk", "text": "1,5к на продукти готівкою", "expected": [{"tool": "add_expense", "wallet": "Cash", "amount": "1500", "currency": "uah", "days_ago": 0}]}
+{"lang": "uk", "text": "продукти 412,50 з монобанку", "expected": [{"tool": "add_expense", "wallet": "Monobank", "amount": "412.50", "currency": "uah", "days_ago": 0}]}
+{"lang": "en", "text": "spent $25 on books, cash", "expected": [{"tool": "add_expense", "wallet": "Cash", "amount": "25", "currency": "usd", "days_ago": 0}]}
+{"lang": "uk", "text": "квиток на концерт 30 євро з монобанку", "expected": [{"tool": "add_expense", "wallet": "Monobank", "amount": "30", "currency": "eur", "days_ago": 0}]}
+{"lang": "en", "text": "netflix 7.99 eur from monobank", "expected": [{"tool": "add_expense", "wallet": "Monobank", "amount": "7.99", "currency": "eur", "days_ago": 0}]}
+{"lang": "uk", "text": "таксі 150 з монобанку, ой ні, 180", "expected": [{"tool": "add_expense", "wallet": "Monobank", "amount": "180", "currency": "uah", "days_ago": 0}]}
+{"lang": "uk", "text": "мінус 300 на таксі з монобанку", "expected": [{"tool": "add_expense", "wallet": "Monobank", "amount": "300", "currency": "uah", "days_ago": 0}]}
+{"lang": "uk", "text": "заплатив за свєт 900 з монобанка", "expected": [{"tool": "add_expense", "wallet": "Monobank", "amount": "900", "currency": "uah", "days_ago": 0}]}
+{"lang": "uk", "text": "kava 70 hrn monobank", "expected": [{"tool": "add_expense", "wallet": "Monobank", "amount": "70", "currency": "uah", "days_ago": 0}]}
+{"lang": "uk", "text": "кава 60", "expected": [{"tool": "add_expense", "wallet": null, "amount": "60", "currency": null, "days_ago": 0}]}
+{"lang": "uk", "text": "купив каву", "expected": []}
+{"lang": "uk", "text": "привіт, як справи?", "expected": []}
+{"lang": "uk", "text": "скільки я витратив цього тижня?", "expected": []}
+{"lang": "en", "text": "how much money do I have on savings?", "expected": []}
+{"lang": "en", "text": "remind me to pay rent tomorrow", "expected": []}

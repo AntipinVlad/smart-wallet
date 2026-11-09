@@ -5,6 +5,7 @@ from pathlib import Path
 
 import aiohttp
 from fastapi import FastAPI
+from openai import AsyncOpenAI
 from redis.asyncio import Redis
 
 from app.api.deps import AppState
@@ -39,8 +40,11 @@ async def lifespan(_: FastAPI) -> AsyncIterator[AppState]:
         socket_timeout=settings.redis_timeout_seconds,
         socket_connect_timeout=settings.redis_timeout_seconds,
     )
-    async with aiohttp.ClientSession(timeout=timeout) as http_session, redis:
-        yield AppState(http_session=http_session, redis=redis)
+    openai_client = AsyncOpenAI(
+        api_key=settings.openai_api_key.get_secret_value(), timeout=settings.openai_timeout_seconds
+    )
+    async with aiohttp.ClientSession(timeout=timeout) as http_session, redis, openai_client:
+        yield AppState(http_session=http_session, redis=redis, openai=openai_client)
     # Database and queue connections belong to this event loop, so they are closed before it stops
     await engine.dispose()
     # Only the connection pool: startup() is not called, it would make the app fail to start without Redis

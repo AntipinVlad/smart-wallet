@@ -29,6 +29,7 @@ async def add_income(db: AsyncSession, current_user: User, operation: OperationR
         amount=operation.amount,
         currency=wallet.currency,
         description=operation.description,
+        created_at=operation.created_at,
     )
     await db.commit()
     # After commit: before it the worker's own connection cannot see the operation yet
@@ -53,6 +54,7 @@ async def add_expense(db: AsyncSession, current_user: User, operation: Operation
         amount=operation.amount,
         currency=wallet.currency,
         description=operation.description,
+        created_at=operation.created_at,
     )
     await db.commit()
     # After commit: before it the worker's own connection cannot see the operation yet
@@ -109,6 +111,7 @@ async def transfer_between_wallets(
         subcategory=TransferDirection.OUTGOING,
         transfer_id=transfer_id,
         description=f"Transfer to {to_wallet.name}",
+        created_at=transfer.created_at,
     )
     incoming = await operations_repository.create_operation(
         db=db,
@@ -120,6 +123,7 @@ async def transfer_between_wallets(
         subcategory=TransferDirection.INCOMING,
         transfer_id=transfer_id,
         description=f"Transfer from {from_wallet.name}",
+        created_at=transfer.created_at,
     )
     await db.commit()
     return [OperationResponse.model_validate(outgoing), OperationResponse.model_validate(incoming)]

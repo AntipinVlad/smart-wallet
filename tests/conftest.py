@@ -37,6 +37,7 @@ from app.main import app
 from app.models import Operation, User, Wallet
 
 PASSWORD = "correct-password"
+TIMEZONE = "Europe/Kyiv"
 OTHER_REQUEST_SECONDS = 2
 PASSWORD_HASH = hash_password(PASSWORD)
 
@@ -124,8 +125,8 @@ def db_session() -> Generator[Session, None, None]:
 
 @pytest.fixture()
 def make_user(db_session) -> Callable[..., User]:
-    def _make_user(login: str = "user") -> User:
-        user = User(login=login, password_hash=PASSWORD_HASH)
+    def _make_user(login: str = "user", timezone: str = TIMEZONE) -> User:
+        user = User(login=login, password_hash=PASSWORD_HASH, timezone=timezone)
         db_session.add(user)
         db_session.commit()
         return user

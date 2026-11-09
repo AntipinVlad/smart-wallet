@@ -17,6 +17,7 @@ from app.core.exceptions import (
     ExternalServiceUnavailableError,
     NotFoundError,
     TooManyRequestsError,
+    UnprocessableError,
 )
 from app.schemas import ErrorResponse
 
@@ -27,6 +28,7 @@ STATUS_BY_ERROR_GROUP: dict[type[AppError], int] = {
     NotFoundError: 404,
     ConflictError: 409,
     AuthenticationError: 401,
+    UnprocessableError: 422,
     TooManyRequestsError: 429,
     ExternalServiceError: 502,
     ExternalServiceUnavailableError: 503,

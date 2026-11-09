@@ -2,23 +2,27 @@
 
 A personal finance API built with FastAPI. Users keep wallets in different currencies, record income and expenses, transfer money between their wallets with currency conversion, and browse their operation history.
 
-New income and expense operations are categorized automatically by an OpenAI model in a background worker. Descriptions can be in English or Ukrainian. Next on the roadmap: semantic search with pgvector, and an assistant that answers questions about your finances.
+Operations can be entered as plain text: "coffee 85 from Monobank, taxi 200 cash yesterday" becomes ready drafts that the user checks and confirms. New income and expense operations are categorized automatically by an OpenAI model in a background worker. Text can be in English or Ukrainian.
+
+Next on the roadmap: spending analytics by month, quarter, year and custom periods, AI tips based on these numbers, semantic search with pgvector, and an assistant that answers questions about your finances.
 
 ## Features
 
 | Endpoint | Description | Auth |
 |---|---|---|
-| `POST /api/v1/users` | Register | — |
+| `POST /api/v1/users` | Register, with an IANA time zone such as `Europe/Kyiv` | — |
 | `GET /api/v1/users/me` | Current user | ✓ |
+| `PATCH /api/v1/users/me` | Change the time zone | ✓ |
 | `POST /api/v1/auth/login` | Log in: sets the token cookies, attempts are rate limited | — |
 | `POST /api/v1/auth/refresh` | Get a new token pair with the refresh token | refresh cookie |
 | `POST /api/v1/auth/logout` | Revoke the refresh token and delete the cookies | — |
 | `POST /api/v1/wallets` | Create a wallet | ✓ |
 | `GET /api/v1/wallets` | List own wallets | ✓ |
 | `GET /api/v1/balance` | Total balance of all wallets in UAH | ✓ |
-| `POST /api/v1/operations/income` | Add income | ✓ |
-| `POST /api/v1/operations/expense` | Add an expense | ✓ |
+| `POST /api/v1/operations/income` | Add income, optionally with a past date | ✓ |
+| `POST /api/v1/operations/expense` | Add an expense, optionally with a past date | ✓ |
 | `POST /api/v1/operations/transfers` | Transfer between own wallets, converted at the current rate | ✓ |
+| `POST /api/v1/operations/parse` | Turn plain text into operation drafts. Saves nothing, rate limited per user | ✓ |
 | `GET /api/v1/operations` | Operation history: pages, sorting, filters by wallet and date | ✓ |
 | `GET /health/live` | The process is running | — |
 | `GET /health/ready` | The database answers | — |
@@ -33,7 +37,7 @@ Interactive documentation: <http://localhost:8000/docs> once the app is running.
 | Database | PostgreSQL 17, SQLAlchemy 2.1 (async), psycopg 3, Alembic |
 | Cache and rate limiting | Redis 8, redis-py |
 | Auth | JWT access tokens (PyJWT), rotating refresh tokens, Argon2 password hashes (pwdlib), HttpOnly cookies |
-| AI | OpenAI Python SDK (Responses API, structured outputs) |
+| AI | OpenAI Python SDK (Responses API, structured outputs, function calling) |
 | Background tasks | taskiq with a Redis Streams broker |
 | External APIs | aiohttp |
 | Pagination | fastapi-pagination |
@@ -62,6 +66,7 @@ flowchart LR
     repo --> pg
     services --> redis
     services --> fx
+    services --> ai
     redis --> worker
     worker --> ai
     worker --> pg
@@ -72,6 +77,7 @@ flowchart LR
 - **Money.** Balances are `Decimal` and `NUMERIC(18, 2)`. Wallet rows are locked with `SELECT ... FOR UPDATE` in a fixed order, so concurrent operations never lose an update and transfers cannot deadlock. The exchange rate is fetched before the locks are taken.
 - **Rate limiting.** Login attempts are counted in Redis by IP and by IP plus login, in one atomic Lua script. If Redis is down, login still works and the error is logged.
 - **Categorization.** After an income or expense is saved, the API puts a task into a Redis stream and answers at once. A separate worker asks the model for a category with structured outputs: the answer is always one value of a fixed enum such as `food.groceries`, so the model cannot invent a category. Until the worker is done, the operation has `category: null`. If Redis or OpenAI is unavailable, the operation is still saved, it only stays uncategorized.
+- **Text input.** The model gets three functions (add an expense, add an income, create a transfer) and calls one for every operation in the text. The schema of the functions is built for each request and lists only the user's own wallets, so the model cannot pick another one, and the code checks it again. The answer is a list of drafts: nothing is saved until the client sends a draft to the usual operation endpoints, which own all the money checks. Amounts in another currency are converted at the current rate, and the draft keeps what the user wrote. Dates like "yesterday" are resolved in the user's time zone.
 - **Observability.** Every response has an `X-Request-ID` header, and every log line of that request carries the same id. Logs are plain text locally and JSON on servers.
 
 ```text
@@ -79,7 +85,7 @@ app/
 ├── main.py          app setup: lifespan, middleware, routers
 ├── worker.py        taskiq broker and background tasks
 ├── run_worker.py    starts the worker
-├── ai/              AI features, one package per feature (categorization/: categories, prompt, service)
+├── ai/              AI features, one package per feature: categorization/, parsing/ (text to drafts)
 ├── api/             routes (v1/), dependencies, error handlers, middleware, health checks
 ├── services/        business logic
 ├── repository/      database queries
@@ -87,7 +93,7 @@ app/
 ├── schemas/         Pydantic schemas
 └── core/            settings, exceptions, security, cookies, logging
 alembic/             database migrations
-evals/               categorization examples and a script that measures accuracy
+evals/               examples and scripts that measure the quality of each AI feature
 tests/               API, database, service and config tests
 ```
 
@@ -126,9 +132,10 @@ Settings are read from environment variables or from `.env`. All of them are lis
 | `DATABASE_URL` | ✓ | PostgreSQL connection string |
 | `REDIS_URL` | ✓ | Redis connection string |
 | `JWT_SECRET_KEY` | ✓ | Secret for signing access tokens, at least 32 characters |
-| `OPENAI_API_KEY` | ✓ | OpenAI API key for categorization |
+| `OPENAI_API_KEY` | ✓ | OpenAI API key for categorization and text input |
 | `OPENAI_MODEL` | | `gpt-6-luna` by default |
 | `POSTGRES_USER`, `POSTGRES_PASSWORD`, `POSTGRES_DB` | ✓ | Used by Docker Compose to create the database |
+| `PARSE_RATE_LIMIT_PER_USER`, `PARSE_RATE_LIMIT_WINDOW_SECONDS` | | Text input requests per user: 10 per 60 seconds by default |
 | `LOG_LEVEL`, `LOG_FORMAT` | | `INFO` and `text` by default. Use `json` on servers |
 
 The app does not start if a required setting is missing or invalid.
@@ -144,10 +151,11 @@ uv run mypy                # type check
 
 Tests run against real PostgreSQL and Redis, not mocks: row locks, constraints and numeric precision are behaviour of the database itself. The schema is built by the Alembic migrations, so the tests also check the migrations. OpenAI is never called from tests: they use a fake client.
 
-Categorization quality is measured separately, against the real model. The script sends about 50 short requests with the key from `.env` and prints how many tokens they used:
+The quality of the AI features is measured separately, against the real model. Each script sends about 50 short requests with the key from `.env` and prints the accuracy, the mistakes and how many tokens were used:
 
 ```bash
 uv run python -m evals.run_categorization
+uv run python -m evals.run_parsing
 ```
 
 Database schema changes:
