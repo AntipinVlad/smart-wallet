@@ -22,6 +22,9 @@ class Settings(BaseSettings):
     login_rate_limit_per_ip: int = Field(default=20, ge=1)
     login_rate_limit_per_login: int = Field(default=5, ge=1)
     login_rate_limit_window_seconds: int = Field(default=60, ge=1)
+    # Every parse request is a paid model call
+    parse_rate_limit_per_user: int = Field(default=10, ge=1)
+    parse_rate_limit_window_seconds: int = Field(default=60, ge=1)
     openai_api_key: SecretStr
     openai_model: str = "gpt-6-luna"
     # The SDK default is 10 minutes: a hanging request would hold a worker slot that long

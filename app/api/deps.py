@@ -6,6 +6,7 @@ import aiohttp
 import jwt
 from fastapi import Depends, Request
 from fastapi.security import APIKeyCookie
+from openai import AsyncOpenAI
 from redis.asyncio import Redis
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -25,6 +26,7 @@ access_token_cookie = APIKeyCookie(name=ACCESS_TOKEN_COOKIE, auto_error=False)
 class AppState(TypedDict):
     http_session: aiohttp.ClientSession
     redis: Redis
+    openai: AsyncOpenAI
 
 
 async def get_db() -> AsyncIterator[AsyncSession]:
@@ -40,6 +42,11 @@ def get_http_session(request: Request) -> aiohttp.ClientSession:
 def get_redis(request: Request) -> Redis:
     redis: Redis = request.state.redis
     return redis
+
+
+def get_openai_client(request: Request) -> AsyncOpenAI:
+    openai_client: AsyncOpenAI = request.state.openai
+    return openai_client
 
 
 async def get_current_user(

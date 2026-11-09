@@ -34,7 +34,7 @@ def test_other_framework_errors_get_common_code():
 
 def test_validation_error_lists_invalid_fields(client):
     # Act
-    response = client.post("/api/v1/users", json={"password": "secret-password"})
+    response = client.post("/api/v1/users", json={"password": "secret-password", "timezone": "UTC"})
 
     # Assert
     error = assert_error(response, 422, "VALIDATION_ERROR")

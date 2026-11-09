@@ -1848,7 +1848,7 @@ wheels = [
 
 [[package]]
 name = "smart-wallet"
-version = "1.1.0"
+version = "1.2.0"
 source = { virtual = "." }
 dependencies = [
     { name = "aiohttp" },
@@ -1865,6 +1865,7 @@ dependencies = [
     { name = "sqlalchemy", extra = ["asyncio"] },
     { name = "taskiq" },
     { name = "taskiq-redis" },
+    { name = "tzdata" },
     { name = "uvicorn" },
 ]
 
@@ -1893,6 +1894,7 @@ requires-dist = [
     { name = "sqlalchemy", extras = ["asyncio"], specifier = "==2.1.6" },
     { name = "taskiq", specifier = "==0.13.0" },
     { name = "taskiq-redis", specifier = "==1.2.4" },
+    { name = "tzdata", specifier = "==2026.6" },
     { name = "uvicorn", specifier = "==0.54.0" },
 ]
 

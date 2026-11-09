@@ -9,7 +9,7 @@ from app.core.cookies import ACCESS_TOKEN_COOKIE, REFRESH_TOKEN_COOKIE
 from app.core.security import create_access_token, hash_refresh_token, verify_password
 from app.main import app
 from app.models import RefreshToken, User
-from tests.conftest import OTHER_REQUEST_SECONDS, PASSWORD, Pause, assert_error
+from tests.conftest import OTHER_REQUEST_SECONDS, PASSWORD, TIMEZONE, Pause, assert_error
 
 REFRESH_URL = "/api/v1/auth/refresh"
 LOGOUT_URL = "/api/v1/auth/logout"
@@ -110,7 +110,7 @@ def test_access_token_of_deleted_user(client, db_session, make_user):
 
 
 def test_registered_user_can_login_and_use_cookies(client):
-    client.post("/api/v1/users", json={"login": "user", "password": PASSWORD})
+    client.post("/api/v1/users", json={"login": "user", "password": PASSWORD, "timezone": TIMEZONE})
 
     # Act
     response = login(client)

@@ -25,3 +25,6 @@ docs/
 # IDE
 .idea/
 .vscode/
+
+# Knowledge graph (graphify)
+graphify-out/

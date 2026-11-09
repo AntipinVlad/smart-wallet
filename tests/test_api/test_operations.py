@@ -5,6 +5,7 @@ import pytest
 
 from app.core.exceptions import ExchangeRateNotFoundError
 from app.enums import CurrencyEnum
+from app.models import Operation
 from tests.conftest import assert_error
 
 
@@ -14,12 +15,16 @@ def add_operation(client, auth, user, endpoint: str, wallet_id: int, **payload):
     )
 
 
-def transfer(client, auth, user, from_wallet_id: int, to_wallet_id: int, amount: Decimal | str = "50"):
+def transfer(client, auth, user, from_wallet_id: int, to_wallet_id: int, amount: Decimal | str = "50", **payload):
     return client.post(
         "/api/v1/operations/transfers",
-        json={"from_wallet_id": from_wallet_id, "to_wallet_id": to_wallet_id, "amount": str(amount)},
+        json={"from_wallet_id": from_wallet_id, "to_wallet_id": to_wallet_id, "amount": str(amount)} | payload,
         headers=auth(user),
     )
+
+
+PAST_DATE = "2026-11-08T18:30:00+02:00"
+FUTURE_DATE = "2999-01-01T00:00:00+00:00"
 
 
 def test_add_income(client, db_session, make_user, make_wallet, auth):
@@ -61,6 +66,22 @@ def test_add_expense(client, db_session, make_user, make_wallet, auth, amount, b
     assert wallet.balance == balance_after
 
 
+@pytest.mark.parametrize("endpoint", ["income", "expense"])
+def test_add_operation_on_past_date(client, db_session, make_user, make_wallet, auth, endpoint):
+    user = make_user()
+    wallet = make_wallet(user)
+
+    # Act
+    response = add_operation(client, auth, user, endpoint, wallet.id, created_at=PAST_DATE)
+
+    # Assert
+    assert response.status_code == 201
+    created_at = datetime.fromisoformat(response.json()["created_at"])
+    assert created_at == datetime.fromisoformat(PAST_DATE)
+    operation = db_session.get(Operation, response.json()["id"])
+    assert operation.created_at == datetime.fromisoformat(PAST_DATE)
+
+
 def test_add_expense_not_enough_money(client, db_session, make_user, make_wallet, auth):
     user = make_user()
     wallet = make_wallet(user, balance=Decimal(200))
@@ -83,6 +104,8 @@ def test_add_expense_not_enough_money(client, db_session, make_user, make_wallet
         ("expense", {"amount": "12345678901234567.00"}),
         ("income", {"description": "a" * 256}),
         ("expense", {"wallet_id": "card"}),
+        ("income", {"created_at": "2026-11-08T18:30:00"}),
+        ("expense", {"created_at": FUTURE_DATE}),
     ],
     ids=[
         "zero_amount",
@@ -91,6 +114,8 @@ def test_add_expense_not_enough_money(client, db_session, make_user, make_wallet
         "too_many_digits",
         "long_description",
         "wallet_id_not_a_number",
+        "date_without_time_zone",
+        "date_in_future",
     ],
 )
 def test_operation_rejects_invalid_request(client, make_user, make_wallet, auth, endpoint, payload):
@@ -326,6 +351,21 @@ def test_transfer_same_currency(client, db_session, make_user, make_wallet, auth
     assert (source.balance, target.balance) == (Decimal(150), Decimal(60))
 
 
+def test_transfer_on_past_date(client, make_user, make_wallet, auth, mock_exchange_rate):
+    user = make_user()
+    source = make_wallet(user, name="card")
+    target = make_wallet(user, name="cash")
+
+    # Act
+    response = transfer(client, auth, user, source.id, target.id, created_at=PAST_DATE)
+
+    # Assert
+    assert response.status_code == 201
+    outgoing, incoming = response.json()
+    expected = datetime.fromisoformat(PAST_DATE)
+    assert datetime.fromisoformat(outgoing["created_at"]) == datetime.fromisoformat(incoming["created_at"]) == expected
+
+
 def test_transfer_converts_currency(client, db_session, make_user, make_wallet, auth, mock_exchange_rate):
     user = make_user()
     source = make_wallet(user, name="dollars", balance=Decimal(200), currency=CurrencyEnum.USD)
@@ -394,17 +434,17 @@ def test_transfer_to_unavailable_wallet(client, db_session, make_user, make_wall
 
 
 @pytest.mark.parametrize(
-    "to_same_wallet, amount",
-    [(True, "50"), (False, "-50"), (False, "0.001")],
-    ids=["same_wallet", "negative_amount", "too_many_decimals"],
+    "to_same_wallet, payload",
+    [(True, {}), (False, {"amount": "-50"}), (False, {"amount": "0.001"}), (False, {"created_at": FUTURE_DATE})],
+    ids=["same_wallet", "negative_amount", "too_many_decimals", "date_in_future"],
 )
-def test_transfer_rejects_invalid_request(client, make_user, make_wallet, auth, to_same_wallet, amount):
+def test_transfer_rejects_invalid_request(client, make_user, make_wallet, auth, to_same_wallet, payload):
     user = make_user()
     source = make_wallet(user, name="card")
     target = source if to_same_wallet else make_wallet(user, name="cash")
 
     # Act
-    response = transfer(client, auth, user, source.id, target.id, amount)
+    response = transfer(client, auth, user, source.id, target.id, **payload)
 
     # Assert
     assert_error(response, 422, "VALIDATION_ERROR")

@@ -16,6 +16,9 @@ class ErrorCode(StrEnum):
     EXCHANGE_SERVICE_UNAVAILABLE = "EXCHANGE_SERVICE_UNAVAILABLE"
     DATABASE_UNAVAILABLE = "DATABASE_UNAVAILABLE"
     RATE_LIMIT_EXCEEDED = "RATE_LIMIT_EXCEEDED"
+    OPERATION_NOT_RECOGNIZED = "OPERATION_NOT_RECOGNIZED"
+    AI_SERVICE_UNAVAILABLE = "AI_SERVICE_UNAVAILABLE"
+    AI_INVALID_RESPONSE = "AI_INVALID_RESPONSE"
 
     # No error class: set by the handlers in app/api/errors.py
     VALIDATION_ERROR = "VALIDATION_ERROR"
@@ -49,6 +52,10 @@ class ConflictError(AppError):
 
 class AuthenticationError(AppError):
     """The client is not authenticated: no token, an invalid token, or wrong credentials."""
+
+
+class UnprocessableError(AppError):
+    """The request is valid, but there is nothing in it the app can work with."""
 
 
 class TooManyRequestsError(AppError):
@@ -139,3 +146,24 @@ class RateLimitExceededError(TooManyRequestsError):
     def __init__(self, retry_after_seconds: int) -> None:
         super().__init__("Too many requests, try again later")
         self.headers = {"Retry-After": str(retry_after_seconds)}
+
+
+class OperationNotRecognizedError(UnprocessableError):
+    code = ErrorCode.OPERATION_NOT_RECOGNIZED
+
+    def __init__(self) -> None:
+        super().__init__("No operation found in the text")
+
+
+class AiServiceUnavailableError(ExternalServiceUnavailableError):
+    code = ErrorCode.AI_SERVICE_UNAVAILABLE
+
+    def __init__(self) -> None:
+        super().__init__("AI service unavailable")
+
+
+class AiInvalidResponseError(ExternalServiceError):
+    code = ErrorCode.AI_INVALID_RESPONSE
+
+    def __init__(self) -> None:
+        super().__init__("AI service returned an answer that cannot be used")
