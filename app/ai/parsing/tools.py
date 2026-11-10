@@ -29,8 +29,8 @@ class OperationArguments(BaseModel):
     date: datetime.date = Field(description="Day of the operation. Today unless the message names another day")
     description: str = Field(description="What the money was for, short, in the language of the message")
 
-    def wallet_ids(self) -> list[int | None]:
-        return [self.wallet_id]
+    def wallet_ids(self) -> list[int]:
+        return [] if self.wallet_id is None else [self.wallet_id]
 
 
 class TransferArguments(BaseModel):
@@ -40,8 +40,8 @@ class TransferArguments(BaseModel):
     currency: CurrencyEnum | None = Field(description=CURRENCY_HINT)
     date: datetime.date = Field(description="Day of the transfer. Today unless the message names another day")
 
-    def wallet_ids(self) -> list[int | None]:
-        return [self.from_wallet_id, self.to_wallet_id]
+    def wallet_ids(self) -> list[int]:
+        return [wallet_id for wallet_id in (self.from_wallet_id, self.to_wallet_id) if wallet_id is not None]
 
 
 OPERATION_TYPE_BY_TOOL: dict[str, Literal[OperationType.EXPENSE, OperationType.INCOME]] = {

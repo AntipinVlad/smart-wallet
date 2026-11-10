@@ -16,6 +16,7 @@ from app.core.security import decode_access_token
 from app.database import SessionLocal
 from app.models import User
 from app.repository import users as users_repository
+from app.services.exchange_rates import DailyRateLoader
 
 logger = logging.getLogger(__name__)
 
@@ -27,6 +28,7 @@ class AppState(TypedDict):
     http_session: aiohttp.ClientSession
     redis: Redis
     openai: AsyncOpenAI
+    rate_loader: DailyRateLoader
 
 
 async def get_db() -> AsyncIterator[AsyncSession]:
@@ -47,6 +49,11 @@ def get_redis(request: Request) -> Redis:
 def get_openai_client(request: Request) -> AsyncOpenAI:
     openai_client: AsyncOpenAI = request.state.openai
     return openai_client
+
+
+def get_rate_loader(request: Request) -> DailyRateLoader:
+    rate_loader: DailyRateLoader = request.state.rate_loader
+    return rate_loader
 
 
 async def get_current_user(

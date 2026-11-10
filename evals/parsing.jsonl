@@ -41,3 +41,6 @@
 {"lang": "uk", "text": "скільки я витратив цього тижня?", "expected": []}
 {"lang": "en", "text": "how much money do I have on savings?", "expected": []}
 {"lang": "en", "text": "remind me to pay rent tomorrow", "expected": []}
+{"lang": "uk", "text": "суші за 2000 єн з монобанку", "expected": [{"tool": "add_expense", "wallet": "Monobank", "amount": "2000", "currency": "jpy", "days_ago": 0}]}
+{"lang": "en", "text": "taxi in London 15 pounds, cash", "expected": [{"tool": "add_expense", "wallet": "Cash", "amount": "15", "currency": "gbp", "days_ago": 0}]}
+{"lang": "uk", "text": "вчора купив годинник за 300 франків з savings", "expected": [{"tool": "add_expense", "wallet": "Savings", "amount": "300", "currency": "chf", "days_ago": 1}]}

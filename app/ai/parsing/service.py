@@ -118,7 +118,6 @@ async def parse_operations(
 def _read_call(
     call: ResponseFunctionToolCall, wallets_by_id: dict[int, Wallet]
 ) -> OperationArguments | TransferArguments:
-    """Every check of the model answer: what comes out is safe to build a draft from."""
     arguments_model = ARGUMENTS_BY_TOOL.get(call.name)
     if arguments_model is None:
         logger.error("Model called unknown function %s", call.name)
@@ -129,10 +128,7 @@ def _read_call(
         # Without input values: they hold what the user wrote
         logger.error("Model called %s with invalid arguments: %s", call.name, e.errors(include_input=False))
         raise AiInvalidResponseError() from e
-    # The schema lists only the user's wallets, but Pydantic does not check that list
-    foreign = [
-        wallet_id for wallet_id in arguments.wallet_ids() if wallet_id is not None and wallet_id not in wallets_by_id
-    ]
+    foreign = set(arguments.wallet_ids()) - wallets_by_id.keys()
     if foreign:
         logger.error("Model chose wallets %s, which are not in the user's list", foreign)
         raise AiInvalidResponseError()
@@ -153,7 +149,6 @@ async def _operation_draft(
     context: DraftContext,
 ) -> OperationDraft:
     wallet_id = arguments.wallet_id
-    # One wallet: nothing to choose from
     if wallet_id is None and len(context.wallets_by_id) == 1:
         wallet_id = next(iter(context.wallets_by_id))
     wallet = context.wallet(wallet_id)
@@ -168,7 +163,6 @@ async def _operation_draft(
 
 
 async def _transfer_draft(arguments: TransferArguments, context: DraftContext) -> TransferDraft:
-    # The transfer endpoint takes the amount in the currency of the source wallet
     source = context.wallet(arguments.from_wallet_id)
     amount = await _in_wallet_currency(context.http_session, arguments.amount, arguments.currency, source)
     return TransferDraft(

@@ -19,6 +19,7 @@ class ErrorCode(StrEnum):
     OPERATION_NOT_RECOGNIZED = "OPERATION_NOT_RECOGNIZED"
     AI_SERVICE_UNAVAILABLE = "AI_SERVICE_UNAVAILABLE"
     AI_INVALID_RESPONSE = "AI_INVALID_RESPONSE"
+    INVALID_PERIOD = "INVALID_PERIOD"
 
     # No error class: set by the handlers in app/api/errors.py
     VALIDATION_ERROR = "VALIDATION_ERROR"
@@ -153,6 +154,10 @@ class OperationNotRecognizedError(UnprocessableError):
 
     def __init__(self) -> None:
         super().__init__("No operation found in the text")
+
+
+class InvalidPeriodError(UnprocessableError):
+    code = ErrorCode.INVALID_PERIOD
 
 
 class AiServiceUnavailableError(ExternalServiceUnavailableError):

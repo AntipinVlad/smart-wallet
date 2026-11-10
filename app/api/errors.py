@@ -98,7 +98,7 @@ def error_responses(*error_types: type[AppError], validation: bool = False) -> d
     for error_type in error_types:
         codes_by_status.setdefault(status_code_for(error_type), []).append(error_type.code)
     if validation:
-        codes_by_status[422] = [ErrorCode.VALIDATION_ERROR]
+        codes_by_status[422] = [ErrorCode.VALIDATION_ERROR, *codes_by_status.get(422, [])]
     return {
         status_code: _documented_response(status_code, codes) for status_code, codes in sorted(codes_by_status.items())
     }

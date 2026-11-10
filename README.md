@@ -1,10 +1,12 @@
 # Smart Wallet
 
-A personal finance API built with FastAPI. Users keep wallets in different currencies, record income and expenses, transfer money between their wallets with currency conversion, and browse their operation history.
+A personal finance API built with FastAPI. Users keep wallets in 15 currencies (UAH, USD, EUR, GBP, JPY, CHF, CNY, CAD, AUD, HKD, SGD, SEK, NOK, KRW, NZD), record income and expenses, transfer money between their wallets with currency conversion, and browse their operation history.
 
 Operations can be entered as plain text: "coffee 85 from Monobank, taxi 200 cash yesterday" becomes ready drafts that the user checks and confirms. New income and expense operations are categorized automatically by an OpenAI model in a background worker. Text can be in English or Ukrainian.
 
-Next on the roadmap: spending analytics by month, quarter, year and custom periods, AI tips based on these numbers, semantic search with pgvector, and an assistant that answers questions about your finances.
+Analytics shows income and expenses of a month, quarter, year or any range by category, compares them with the previous period, and draws them day by day, week by week or month by month. Reports can be in any currency: every operation is converted at the exchange rate of its own day.
+
+Next on the roadmap: AI tips based on these numbers, semantic search with pgvector, and an assistant that answers questions about your finances.
 
 ## Features
 
@@ -18,12 +20,14 @@ Next on the roadmap: spending analytics by month, quarter, year and custom perio
 | `POST /api/v1/auth/logout` | Revoke the refresh token and delete the cookies | — |
 | `POST /api/v1/wallets` | Create a wallet | ✓ |
 | `GET /api/v1/wallets` | List own wallets | ✓ |
-| `GET /api/v1/balance` | Total balance of all wallets in UAH | ✓ |
+| `GET /api/v1/balance` | Total balance of all wallets at the current rate, in UAH or `?currency=` | ✓ |
 | `POST /api/v1/operations/income` | Add income, optionally with a past date | ✓ |
 | `POST /api/v1/operations/expense` | Add an expense, optionally with a past date | ✓ |
 | `POST /api/v1/operations/transfers` | Transfer between own wallets, converted at the current rate | ✓ |
 | `POST /api/v1/operations/parse` | Turn plain text into operation drafts. Saves nothing, rate limited per user | ✓ |
 | `GET /api/v1/operations` | Operation history: pages, sorting, filters by wallet and date | ✓ |
+| `GET /api/v1/analytics/summary` | Totals of a period by category and subcategory, compared with the previous period | ✓ |
+| `GET /api/v1/analytics/timeline` | Income and expenses of a period by day, week or month | ✓ |
 | `GET /health/live` | The process is running | — |
 | `GET /health/ready` | The database answers | — |
 
@@ -57,9 +61,9 @@ flowchart LR
         mw --> api --> services --> repo
     end
     pg[("PostgreSQL")]
-    redis[("Redis<br/>login rate limits, task queue")]
+    redis[("Redis<br/>rate limits, task queue,<br/>exchange rate locks")]
     fx["Exchange rate API"]
-    worker["taskiq worker<br/>categorization"]
+    worker["taskiq worker<br/>categorization, exchange rates"]
     ai["OpenAI"]
 
     client --> mw
@@ -69,6 +73,7 @@ flowchart LR
     services --> ai
     redis --> worker
     worker --> ai
+    worker --> fx
     worker --> pg
 ```
 
@@ -78,6 +83,8 @@ flowchart LR
 - **Rate limiting.** Login attempts are counted in Redis by IP and by IP plus login, in one atomic Lua script. If Redis is down, login still works and the error is logged.
 - **Categorization.** After an income or expense is saved, the API puts a task into a Redis stream and answers at once. A separate worker asks the model for a category with structured outputs: the answer is always one value of a fixed enum such as `food.groceries`, so the model cannot invent a category. Until the worker is done, the operation has `category: null`. If Redis or OpenAI is unavailable, the operation is still saved, it only stays uncategorized.
 - **Text input.** The model gets three functions (add an expense, add an income, create a transfer) and calls one for every operation in the text. The schema of the functions is built for each request and lists only the user's own wallets, so the model cannot pick another one, and the code checks it again. The answer is a list of drafts: nothing is saved until the client sends a draft to the usual operation endpoints, which own all the money checks. Amounts in another currency are converted at the current rate, and the draft keeps what the user wrote. Dates like "yesterday" are resolved in the user's time zone.
+- **Analytics.** A period is a range of days in the user's time zone: the current month by default, a month, quarter or year that holds a date, or a range up to ten years. SQL sums the operations by local day, currency and category and converts each sum at the rate of its day, then the service rounds the smallest parts first, so they always add up to the totals. Transfers between own wallets are not counted. A period still going on is compared with the same days of the previous one.
+- **Exchange rates by day.** Past rates never change, so they are stored in Postgres and never cleaned up: one API request per day fills every currency. Concurrent reports that need the same missing day share one load: in-process single flight, plus a Redis lock (`SET NX EX`, released by a Lua script) between processes, where a waiting process checks the database less and less often. If Redis is down, rates are loaded without the lock. New operations queue a task that loads the rates of their day ahead of the first report.
 - **Observability.** Every response has an `X-Request-ID` header, and every log line of that request carries the same id. Logs are plain text locally and JSON on servers.
 
 ```text
@@ -113,7 +120,7 @@ uv run alembic upgrade head
 uv run uvicorn app.main:app --reload
 ```
 
-In a second terminal, start the worker that categorizes operations:
+In a second terminal, start the worker that categorizes operations and loads exchange rates ahead of reports:
 
 ```bash
 uv run python -m app.run_worker
@@ -136,6 +143,8 @@ Settings are read from environment variables or from `.env`. All of them are lis
 | `OPENAI_MODEL` | | `gpt-6-luna` by default |
 | `POSTGRES_USER`, `POSTGRES_PASSWORD`, `POSTGRES_DB` | ✓ | Used by Docker Compose to create the database |
 | `PARSE_RATE_LIMIT_PER_USER`, `PARSE_RATE_LIMIT_WINDOW_SECONDS` | | Text input requests per user: 10 per 60 seconds by default |
+| `EXCHANGE_API_HISTORY_URL`, `EXCHANGE_API_HISTORY_START` | | Rates of past days for analytics, and the first day the API has them |
+| `ANALYTICS_MAX_RANGE_DAYS` | | Longest report range: ten years by default |
 | `LOG_LEVEL`, `LOG_FORMAT` | | `INFO` and `text` by default. Use `json` on servers |
 
 The app does not start if a required setting is missing or invalid.
