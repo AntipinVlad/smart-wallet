@@ -1,11 +1,14 @@
 from app.schemas.analytics import (
     AnalyticsQuery,
+    CategoriesQuery,
+    CategoriesResponse,
+    CategoryDataset,
     CategoryTotal,
     PeriodResponse,
     PreviousPeriod,
     SubcategoryTotal,
     SummaryResponse,
-    TimelinePoint,
+    TimelineDataset,
     TimelineQuery,
     TimelineResponse,
 )
@@ -31,6 +34,9 @@ from app.schemas.wallet import CreateWalletRequest, TotalBalance, WalletResponse
 
 __all__ = [
     "AnalyticsQuery",
+    "CategoriesQuery",
+    "CategoriesResponse",
+    "CategoryDataset",
     "CategoryTotal",
     "CreateWalletRequest",
     "Draft",
@@ -53,7 +59,7 @@ __all__ = [
     "PreviousPeriod",
     "SubcategoryTotal",
     "SummaryResponse",
-    "TimelinePoint",
+    "TimelineDataset",
     "TimelineQuery",
     "TimelineResponse",
     "TokenPair",

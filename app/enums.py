@@ -41,3 +41,19 @@ class TimelineStep(StrEnum):
     DAY = auto()
     WEEK = auto()
     MONTH = auto()
+
+
+class TimelineSeries(StrEnum):
+    INCOME = auto()
+    EXPENSE = auto()
+    NET = auto()
+
+
+class ReportType(StrEnum):
+    EXPENSE = auto()
+    INCOME = auto()
+
+
+class PeriodSeries(StrEnum):
+    CURRENT = auto()
+    PREVIOUS = auto()

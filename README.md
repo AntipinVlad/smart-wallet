@@ -27,7 +27,8 @@ Next on the roadmap: AI tips based on these numbers, semantic search with pgvect
 | `POST /api/v1/operations/parse` | Turn plain text into operation drafts. Saves nothing, rate limited per user | ✓ |
 | `GET /api/v1/operations` | Operation history: pages, sorting, filters by wallet and date | ✓ |
 | `GET /api/v1/analytics/summary` | Totals of a period by category and subcategory, compared with the previous period | ✓ |
-| `GET /api/v1/analytics/timeline` | Income and expenses of a period by day, week or month | ✓ |
+| `GET /api/v1/analytics/categories` | Expense or income categories of a period and of the previous one, as Chart.js data | ✓ |
+| `GET /api/v1/analytics/timeline` | Income and expenses of a period by day, week or month, as Chart.js data | ✓ |
 | `GET /health/live` | The process is running | — |
 | `GET /health/ready` | The database answers | — |
 

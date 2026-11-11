@@ -432,12 +432,14 @@ def timeline(client, auth, user, **params):
     return client.get("/api/v1/analytics/timeline", params=params, headers=auth(user))
 
 
-def point(day: str, income: str = "0.00", expense: str = "0.00", net: str = "0.00") -> dict[str, str]:
-    return {"date": day, "income": income, "expense": expense, "net": net}
+def series(body: dict) -> dict[str, list[float]]:
+    return {dataset["key"]: dataset["data"] for dataset in body["datasets"]}
 
 
 class TestTimeline:
-    def test_points_by_day_include_days_without_operations(self, client, make_user, make_wallet, make_operation, auth):
+    def test_chart_js_labels_and_datasets_include_days_without_operations(
+        self, client, make_user, make_wallet, make_operation, auth
+    ):
         user = make_user()
         card = make_wallet(user)
         make_operation(card, Decimal(50), at(2))
@@ -453,12 +455,23 @@ class TestTimeline:
             "currency": "uah",
             "wallet_id": None,
             "group_by": "day",
-            "points": [
-                point("2026-10-01"),
-                point("2026-10-02", expense="50.00", net="-50.00"),
-                point("2026-10-03", income="100.00", net="100.00"),
+            "labels": ["2026-10-01", "2026-10-02", "2026-10-03"],
+            "datasets": [
+                {"key": "income", "data": [0.0, 0.0, 100.0]},
+                {"key": "expense", "data": [0.0, 50.0, 0.0]},
+                {"key": "net", "data": [0.0, -50.0, 100.0]},
             ],
         }
+
+    def test_amounts_keep_cents(self, client, make_user, make_wallet, make_operation, auth):
+        user = make_user()
+        make_operation(make_wallet(user), Decimal("10.55"), at(5))
+
+        # Act
+        response = timeline(client, auth, user, date_from="2026-10-05", date_to="2026-10-05")
+
+        # Assert
+        assert series(response.json())["expense"] == [10.55]
 
     def test_operation_is_on_its_day_in_time_zone_of_user(self, client, make_user, make_wallet, make_operation, auth):
         user = make_user()
@@ -469,7 +482,7 @@ class TestTimeline:
         response = timeline(client, auth, user, date_from="2026-10-01", date_to="2026-10-02")
 
         # Assert
-        assert response.json()["points"] == [point("2026-10-01"), point("2026-10-02", expense="10.00", net="-10.00")]
+        assert series(response.json())["expense"] == [0.0, 10.0]
 
     @pytest.mark.parametrize(
         "params, group_by, points",
@@ -488,7 +501,10 @@ class TestTimeline:
 
         # Assert
         body = response.json()
-        assert (body["group_by"], len(body["points"])) == (group_by, points)
+        assert (body["group_by"], len(body["labels"])) == (group_by, points)
+        assert {key: len(data) for key, data in series(body).items()} == dict.fromkeys(
+            ("income", "expense", "net"), points
+        )
 
     def test_weeks_start_on_monday(self, client, make_user, make_wallet, make_operation, auth):
         user = make_user()
@@ -498,11 +514,9 @@ class TestTimeline:
         response = timeline(client, auth, user, date_from="2026-10-28", date_to="2026-11-10", group_by="week")
 
         # Assert
-        assert response.json()["points"] == [
-            point("2026-10-28"),
-            point("2026-11-02", expense="10.00", net="-10.00"),
-            point("2026-11-09"),
-        ]
+        body = response.json()
+        assert body["labels"] == ["2026-10-28", "2026-11-02", "2026-11-09"]
+        assert series(body)["expense"] == [0.0, 10.0, 0.0]
 
     def test_months_without_operations_are_zero(self, client, make_user, make_wallet, make_operation, auth):
         user = make_user()
@@ -514,11 +528,9 @@ class TestTimeline:
         response = timeline(client, auth, user, date_from="2025-01-01", date_to="2025-03-31", group_by="month")
 
         # Assert
-        assert response.json()["points"] == [
-            point("2025-01-01", expense="10.00", net="-10.00"),
-            point("2025-02-01"),
-            point("2025-03-01", expense="20.00", net="-20.00"),
-        ]
+        body = response.json()
+        assert body["labels"] == ["2025-01-01", "2025-02-01", "2025-03-01"]
+        assert series(body)["expense"] == [10.0, 0.0, 20.0]
 
     def test_converted_without_transfers(self, client, make_user, make_wallet, make_operation, auth, daily_rates):
         user = make_user()
@@ -530,7 +542,7 @@ class TestTimeline:
         response = timeline(client, auth, user, date_from="2026-10-05", date_to="2026-10-05")
 
         # Assert
-        assert response.json()["points"] == [point("2026-10-05", expense="400.00", net="-400.00")]
+        assert series(response.json()) == {"income": [0.0], "expense": [400.0], "net": [-400.0]}
 
     def test_wallet_of_another_user(self, client, make_user, make_wallet, auth):
         user = make_user(login="owner")
@@ -555,6 +567,119 @@ class TestTimeline:
 
         # Assert
         assert_error(response, 422, "VALIDATION_ERROR")
+
+
+def categories(client, auth, user, **params):
+    return client.get("/api/v1/analytics/categories", params=params, headers=auth(user))
+
+
+class TestCategories:
+    def test_chart_js_labels_and_datasets_of_both_periods(self, client, make_user, make_wallet, make_operation, auth):
+        user = make_user()
+        card = make_wallet(user)
+        make_operation(card, Decimal(100), at(5), category="transport", subcategory="taxi")
+        make_operation(card, Decimal("300.50"), at(6), category="food", subcategory="groceries")
+        make_operation(card, Decimal(200), datetime(2026, 9, 5, 12, tzinfo=UTC), category="food")
+        make_operation(card, Decimal(80), datetime(2026, 9, 6, 12, tzinfo=UTC), category="health")
+
+        # Act
+        response = categories(client, auth, user, **OCTOBER)
+
+        # Assert
+        assert response.status_code == 200
+        assert response.json() == {
+            "period": {"date_from": "2026-10-01", "date_to": "2026-10-31"},
+            "previous_period": {"date_from": "2026-09-01", "date_to": "2026-09-30"},
+            "currency": "uah",
+            "wallet_id": None,
+            "type": "expense",
+            "labels": ["food", "transport", "health"],
+            "datasets": [
+                {"key": "current", "data": [300.5, 100.0, 0.0]},
+                {"key": "previous", "data": [200.0, 0.0, 80.0]},
+            ],
+        }
+
+    def test_income_categories(self, client, make_user, make_wallet, make_operation, auth):
+        user = make_user()
+        card = make_wallet(user)
+        make_operation(card, Decimal(1000), at(5), type=OperationType.INCOME, category="salary")
+        make_operation(card, Decimal(50), at(5), category="food")
+
+        # Act
+        response = categories(client, auth, user, **OCTOBER, type="income")
+
+        # Assert
+        body = response.json()
+        assert (body["type"], body["labels"], series(body)) == (
+            "income",
+            ["salary"],
+            {"current": [1000.0], "previous": [0.0]},
+        )
+
+    def test_operations_without_category_are_a_label(self, client, make_user, make_wallet, make_operation, auth):
+        user = make_user()
+        make_operation(make_wallet(user), Decimal(30), DAY_IN_OCTOBER)
+
+        # Act
+        response = categories(client, auth, user, **OCTOBER)
+
+        # Assert
+        assert response.json()["labels"] == ["uncategorized"]
+
+    def test_empty_periods_have_empty_datasets(self, client, make_user, auth):
+        user = make_user()
+
+        # Act
+        response = categories(client, auth, user, **OCTOBER)
+
+        # Assert
+        body = response.json()
+        assert (body["labels"], series(body)) == ([], {"current": [], "previous": []})
+
+    def test_converted_and_filtered_by_wallet(self, client, make_user, make_wallet, make_operation, auth, daily_rates):
+        user = make_user()
+        dollars = make_wallet(user, name="dollars", currency=CurrencyEnum.USD)
+        make_operation(dollars, Decimal(10), DAY_IN_OCTOBER, category="food")
+        make_operation(make_wallet(user, name="cash"), Decimal(20), DAY_IN_OCTOBER, category="food")
+
+        # Act
+        response = categories(client, auth, user, **OCTOBER, wallet_id=dollars.id)
+
+        # Assert
+        body = response.json()
+        assert (body["wallet_id"], series(body)["current"]) == (dollars.id, [400.0])
+
+    def test_wallet_of_another_user(self, client, make_user, make_wallet, auth):
+        user = make_user(login="owner")
+        foreign = make_wallet(make_user(login="other"))
+
+        # Act
+        response = categories(client, auth, user, **OCTOBER, wallet_id=foreign.id)
+
+        # Assert
+        assert_error(response, 404, "WALLET_NOT_FOUND")
+
+    @pytest.mark.parametrize(
+        "params",
+        [OCTOBER | {"type": "transfer"}, {"date": "2026-10-15"}],
+        ids=["transfers_are_not_a_report", "date_without_period"],
+    )
+    def test_invalid_query(self, client, make_user, auth, params):
+        user = make_user()
+
+        # Act
+        response = categories(client, auth, user, **params)
+
+        # Assert
+        assert_error(response, 422, "VALIDATION_ERROR")
+
+    def test_categories_require_login(self, client):
+        # Act
+        response = client.get("/api/v1/analytics/categories")
+
+        # Assert
+        assert_error(response, 401, "NOT_AUTHENTICATED")
 
 
 def without_comparison(items: list[dict]) -> list[dict]:
