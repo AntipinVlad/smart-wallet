@@ -3,7 +3,7 @@ import os
 import threading
 from collections.abc import Callable, Generator
 from concurrent.futures import Future, ThreadPoolExecutor
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime
 from decimal import Decimal
 from pathlib import Path
 from typing import Any
@@ -156,6 +156,7 @@ def make_operation(db_session) -> Callable[..., Operation]:
         type: OperationType = OperationType.EXPENSE,
         description: str | None = None,
         category: str | None = None,
+        subcategory: str | None = None,
     ) -> Operation:
         operation = Operation(
             wallet_id=wallet.id,
@@ -165,6 +166,7 @@ def make_operation(db_session) -> Callable[..., Operation]:
             created_at=created_at,
             description=description,
             category=category,
+            subcategory=subcategory,
         )
         db_session.add(operation)
         db_session.commit()
@@ -187,3 +189,29 @@ def mock_exchange_rate(monkeypatch) -> AsyncMock:
     monkeypatch.setattr("app.services.exchange_service.get_exchange_rate", mock)
     monkeypatch.setattr("app.services.operation.get_exchange_rate", mock)
     return mock
+
+
+class FakeDailyRates:
+    """Stands in for the exchange API of past days: the same rates every day unless a day is set."""
+
+    def __init__(self) -> None:
+        self.default = {CurrencyEnum.USD: Decimal(1), CurrencyEnum.UAH: Decimal(40), CurrencyEnum.EUR: Decimal("0.8")}
+        self.by_day: dict[date, dict[CurrencyEnum, Decimal]] = {}
+        self.unpublished: set[date] = set()
+        self.error: Exception | None = None
+        self.days: list[date] = []
+
+    async def __call__(self, http_session: Any, day: date) -> dict[CurrencyEnum, Decimal] | None:
+        self.days.append(day)
+        if self.error is not None:
+            raise self.error
+        if day in self.unpublished:
+            return None
+        return self.by_day.get(day, self.default)
+
+
+@pytest.fixture()
+def daily_rates(monkeypatch) -> FakeDailyRates:
+    fake = FakeDailyRates()
+    monkeypatch.setattr("app.services.exchange_service.get_daily_rates", fake)
+    return fake

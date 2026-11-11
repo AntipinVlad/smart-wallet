@@ -1,5 +1,5 @@
 import aiohttp
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import get_current_user, get_db, get_http_session
@@ -10,6 +10,7 @@ from app.core.exceptions import (
     NotAuthenticatedError,
     WalletAlreadyExistsError,
 )
+from app.enums import CurrencyEnum
 from app.models import User
 from app.schemas import CreateWalletRequest, TotalBalance, WalletResponse
 from app.services import wallets as wallets_service
@@ -20,14 +21,17 @@ router = APIRouter()
 @router.get(
     "/balance",
     response_model=TotalBalance,
-    responses=error_responses(NotAuthenticatedError, ExchangeRateNotFoundError, ExchangeServiceUnavailableError),
+    responses=error_responses(
+        NotAuthenticatedError, ExchangeRateNotFoundError, ExchangeServiceUnavailableError, validation=True
+    ),
 )
 async def get_balance(
+    currency: CurrencyEnum = Query(CurrencyEnum.UAH, description="Currency of the total"),
     db: AsyncSession = Depends(get_db),
     http_session: aiohttp.ClientSession = Depends(get_http_session),
     current_user: User = Depends(get_current_user),
 ) -> TotalBalance:
-    return await wallets_service.get_total_balance(db, http_session, current_user)
+    return await wallets_service.get_total_balance(db, http_session, current_user, currency)
 
 
 @router.post(

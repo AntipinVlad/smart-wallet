@@ -1,3 +1,14 @@
+from app.schemas.analytics import (
+    AnalyticsQuery,
+    CategoryTotal,
+    PeriodResponse,
+    PreviousPeriod,
+    SubcategoryTotal,
+    SummaryResponse,
+    TimelinePoint,
+    TimelineQuery,
+    TimelineResponse,
+)
 from app.schemas.auth import LoginRequest, TokenPair
 from app.schemas.common import Money
 from app.schemas.error import ErrorBody, ErrorDetail, ErrorResponse
@@ -19,6 +30,8 @@ from app.schemas.user import UserCreateRequest, UserRequest, UserResponse, UserU
 from app.schemas.wallet import CreateWalletRequest, TotalBalance, WalletResponse
 
 __all__ = [
+    "AnalyticsQuery",
+    "CategoryTotal",
     "CreateWalletRequest",
     "Draft",
     "ErrorBody",
@@ -36,6 +49,13 @@ __all__ = [
     "Page",
     "PageParams",
     "ParseRequest",
+    "PeriodResponse",
+    "PreviousPeriod",
+    "SubcategoryTotal",
+    "SummaryResponse",
+    "TimelinePoint",
+    "TimelineQuery",
+    "TimelineResponse",
     "TokenPair",
     "TotalBalance",
     "TransferDraft",

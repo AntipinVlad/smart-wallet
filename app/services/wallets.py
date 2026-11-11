@@ -1,3 +1,4 @@
+import asyncio
 import logging
 from decimal import Decimal
 
@@ -15,18 +16,19 @@ from app.services import exchange_service
 logger = logging.getLogger(__name__)
 
 
-async def get_total_balance(db: AsyncSession, http_session: aiohttp.ClientSession, current_user: User) -> TotalBalance:
+async def get_total_balance(
+    db: AsyncSession, http_session: aiohttp.ClientSession, current_user: User, currency: CurrencyEnum
+) -> TotalBalance:
     wallets = await wallet_repository.get_all_wallets(db, current_user.id)
-    total_balance = Decimal(0)
+    others = list({wallet.currency for wallet in wallets} - {currency})
+    # TaskGroup would raise ExceptionGroup, which the error handlers do not know
+    fetched = await asyncio.gather(
+        *(exchange_service.get_exchange_rate(http_session, other, currency) for other in others)
+    )
+    rates = {currency: Decimal(1), **dict(zip(others, fetched, strict=True))}
 
-    for wallet in wallets:
-        if wallet.currency == CurrencyEnum.UAH:
-            total_balance += wallet.balance
-        else:
-            exchange_rate = await exchange_service.get_exchange_rate(http_session, wallet.currency, CurrencyEnum.UAH)
-            total_balance += round((wallet.balance * exchange_rate), 2)
-
-    return TotalBalance(total_balance=total_balance)
+    total_balance = sum((round(wallet.balance * rates[wallet.currency], 2) for wallet in wallets), Decimal(0))
+    return TotalBalance(total_balance=total_balance, currency=currency)
 
 
 async def create_wallet(db: AsyncSession, current_user: User, wallet: CreateWalletRequest) -> WalletResponse:

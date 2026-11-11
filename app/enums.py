@@ -5,6 +5,19 @@ class CurrencyEnum(StrEnum):
     UAH = auto()
     USD = auto()
     EUR = auto()
+    # The most traded currencies after these (BIS survey): the exchange API has rates of all of them every day
+    GBP = auto()
+    JPY = auto()
+    CHF = auto()
+    CNY = auto()
+    CAD = auto()
+    AUD = auto()
+    HKD = auto()
+    SGD = auto()
+    SEK = auto()
+    NOK = auto()
+    KRW = auto()
+    NZD = auto()
 
 
 class OperationType(StrEnum):
@@ -16,3 +29,15 @@ class OperationType(StrEnum):
 class TransferDirection(StrEnum):
     OUTGOING = auto()
     INCOMING = auto()
+
+
+class PeriodPreset(StrEnum):
+    MONTH = auto()
+    QUARTER = auto()
+    YEAR = auto()
+
+
+class TimelineStep(StrEnum):
+    DAY = auto()
+    WEEK = auto()
+    MONTH = auto()

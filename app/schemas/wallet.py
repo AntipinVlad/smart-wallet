@@ -22,3 +22,4 @@ class WalletResponse(BaseModel):
 
 class TotalBalance(BaseModel):
     total_balance: Decimal
+    currency: CurrencyEnum

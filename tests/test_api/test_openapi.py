@@ -1,5 +1,7 @@
 from typing import Any
 
+import pytest
+
 from app.api.errors import status_code_for
 from app.core.exceptions import AppError, ErrorCode
 from app.main import app
@@ -93,3 +95,20 @@ def test_every_error_has_status_and_code_from_enum():
     # Assert
     assert all(status >= 400 for status in statuses)
     assert all(isinstance(error_type.code, ErrorCode) for error_type in errors)
+
+
+@pytest.mark.parametrize(
+    "route, expected",
+    [
+        ("GET /api/v1/analytics/summary", {"VALIDATION_ERROR", "INVALID_PERIOD"}),
+        ("GET /api/v1/analytics/timeline", {"VALIDATION_ERROR", "INVALID_PERIOD"}),
+        ("POST /api/v1/operations/parse", {"VALIDATION_ERROR", "OPERATION_NOT_RECOGNIZED"}),
+    ],
+    ids=["summary", "timeline", "parse"],
+)
+def test_validation_error_is_documented_with_other_422_errors(route, expected):
+    # Act
+    codes = documented_codes(operations()[route], 422)
+
+    # Assert
+    assert codes == expected

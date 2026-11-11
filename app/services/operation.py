@@ -5,13 +5,14 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.exceptions import InsufficientFundsError, WalletNotFoundError
 from app.enums import OperationType, TransferDirection
-from app.models import User
+from app.models import Operation, User
 from app.repository import operations as operations_repository
 from app.repository import wallets as wallet_repository
 from app.repository.pagination import paginate
 from app.schemas import OperationListQuery, OperationRequest, OperationResponse, Page, TransferRequest
 from app.services.exchange_service import get_exchange_rate
-from app.worker import enqueue_categorization
+from app.services.periods import local_day
+from app.worker import enqueue_categorization, enqueue_exchange_rates
 
 TRANSFER_CATEGORY = "transfer"
 
@@ -32,8 +33,7 @@ async def add_income(db: AsyncSession, current_user: User, operation: OperationR
         created_at=operation.created_at,
     )
     await db.commit()
-    # After commit: before it the worker's own connection cannot see the operation yet
-    await enqueue_categorization(created.id)
+    await _enqueue_background_work(created, current_user)
 
     return OperationResponse.model_validate(created)
 
@@ -57,8 +57,7 @@ async def add_expense(db: AsyncSession, current_user: User, operation: Operation
         created_at=operation.created_at,
     )
     await db.commit()
-    # After commit: before it the worker's own connection cannot see the operation yet
-    await enqueue_categorization(created.id)
+    await _enqueue_background_work(created, current_user)
 
     return OperationResponse.model_validate(created)
 
@@ -127,3 +126,10 @@ async def transfer_between_wallets(
     )
     await db.commit()
     return [OperationResponse.model_validate(outgoing), OperationResponse.model_validate(incoming)]
+
+
+async def _enqueue_background_work(operation: Operation, current_user: User) -> None:
+    # After commit: before it the worker's own connection cannot see the operation yet
+    await enqueue_categorization(operation.id)
+    # Ahead of the first report that needs them
+    await enqueue_exchange_rates(local_day(operation.created_at, current_user.timezone))
