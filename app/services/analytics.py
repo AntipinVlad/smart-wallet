@@ -12,19 +12,22 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
 from app.core.exceptions import ExchangeRateNotFoundError, WalletNotFoundError
-from app.enums import CurrencyEnum, OperationType, PeriodPreset
+from app.enums import CurrencyEnum, OperationType, PeriodPreset, PeriodSeries, TimelineSeries
 from app.models import User
 from app.repository import analytics as analytics_repository
 from app.repository import wallets as wallet_repository
 from app.repository.analytics import OperationFilter, OperationGroup
 from app.schemas import (
     AnalyticsQuery,
+    CategoriesQuery,
+    CategoriesResponse,
+    CategoryDataset,
     CategoryTotal,
     PeriodResponse,
     PreviousPeriod,
     SubcategoryTotal,
     SummaryResponse,
-    TimelinePoint,
+    TimelineDataset,
     TimelineQuery,
     TimelineResponse,
 )
@@ -71,6 +74,13 @@ class TypeSummary(NamedTuple):
     categories: list[CategoryTotal]
 
 
+class ComparedGroups(NamedTuple):
+    period: Period
+    previous: Period
+    groups: list[GroupSum]
+    previous_groups: list[GroupSum]
+
+
 class ComparedFields(TypedDict):
     amount: Decimal
     share: float
@@ -82,11 +92,7 @@ class ComparedFields(TypedDict):
 async def get_summary(
     db: AsyncSession, rate_loader: DailyRateLoader, current_user: User, query: AnalyticsQuery
 ) -> SummaryResponse:
-    await _check_wallet(db, current_user, query.wallet_id)
-    period = _period(current_user, query)
-    previous = period.previous()
-    groups = await _group_sums(db, rate_loader, current_user, query, period)
-    previous_groups = await _group_sums(db, rate_loader, current_user, query, previous)
+    period, previous, groups, previous_groups = await _compared_groups(db, rate_loader, current_user, query)
 
     income = _by_category(groups, previous_groups, OperationType.INCOME)
     expense = _by_category(groups, previous_groups, OperationType.EXPENSE)
@@ -111,6 +117,27 @@ async def get_summary(
     )
 
 
+async def get_categories(
+    db: AsyncSession, rate_loader: DailyRateLoader, current_user: User, query: CategoriesQuery
+) -> CategoriesResponse:
+    period, previous, groups, previous_groups = await _compared_groups(db, rate_loader, current_user, query)
+
+    totals = _by_category(groups, previous_groups, OperationType(query.type)).categories
+    logger.info("Categories of user %s for %s to %s", current_user.id, period.date_from, period.date_to)
+    return CategoriesResponse(
+        period=_period_response(period),
+        previous_period=_period_response(previous),
+        currency=query.currency,
+        wallet_id=query.wallet_id,
+        type=query.type,
+        labels=[total.category for total in totals],
+        datasets=[
+            CategoryDataset(key=PeriodSeries.CURRENT, data=_numbers(total.amount for total in totals)),
+            CategoryDataset(key=PeriodSeries.PREVIOUS, data=_numbers(total.previous_amount for total in totals)),
+        ],
+    )
+
+
 async def get_timeline(
     db: AsyncSession, rate_loader: DailyRateLoader, current_user: User, query: TimelineQuery
 ) -> TimelineResponse:
@@ -128,14 +155,33 @@ async def get_timeline(
         totals = income if group.type == OperationType.INCOME else expense
         totals[index] += group.sum.amount
 
+    income, expense = _cents(income), _cents(expense)
+    net = [step_income - step_expense for step_income, step_expense in zip(income, expense, strict=True)]
     logger.info("Timeline of user %s for %s to %s by %s", current_user.id, period.date_from, period.date_to, step)
     return TimelineResponse(
         period=_period_response(period),
         currency=query.currency,
         wallet_id=query.wallet_id,
         group_by=step,
-        points=[_point(*values) for values in zip(starts, income, expense, strict=True)],
+        labels=starts,
+        datasets=[
+            _dataset(TimelineSeries.INCOME, income),
+            _dataset(TimelineSeries.EXPENSE, expense),
+            _dataset(TimelineSeries.NET, net),
+        ],
     )
+
+
+async def _compared_groups(
+    db: AsyncSession, rate_loader: DailyRateLoader, current_user: User, query: AnalyticsQuery
+) -> ComparedGroups:
+    """Groups of the period and of the previous one, for reports that compare them."""
+    await _check_wallet(db, current_user, query.wallet_id)
+    period = _period(current_user, query)
+    previous = period.previous()
+    groups = await _group_sums(db, rate_loader, current_user, query, period)
+    previous_groups = await _group_sums(db, rate_loader, current_user, query, previous)
+    return ComparedGroups(period, previous, groups, previous_groups)
 
 
 async def _check_wallet(db: AsyncSession, current_user: User, wallet_id: int | None) -> None:
@@ -238,9 +284,17 @@ def _change(amount: Decimal, previous_amount: Decimal) -> float | None:
     return float(round((amount - previous_amount) / previous_amount * 100, 1)) if previous_amount else None
 
 
-def _point(start: date, income: Decimal, expense: Decimal) -> TimelinePoint:
-    income, expense = income.quantize(CENT), expense.quantize(CENT)
-    return TimelinePoint(date=start, income=income, expense=expense, net=income - expense)
+def _cents(amounts: Iterable[Decimal]) -> list[Decimal]:
+    return [amount.quantize(CENT) for amount in amounts]
+
+
+def _dataset(key: TimelineSeries, amounts: Iterable[Decimal]) -> TimelineDataset:
+    return TimelineDataset(key=key, data=_numbers(amounts))
+
+
+def _numbers(amounts: Iterable[Decimal]) -> list[float]:
+    # Chart.js documents numbers as data points; cents fit a float exactly enough for a chart
+    return [float(amount) for amount in amounts]
 
 
 def _period_response(period: Period) -> PeriodResponse:

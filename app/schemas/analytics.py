@@ -5,7 +5,7 @@ from typing import Self
 from pydantic import BaseModel, Field, model_validator
 
 from app.core.config import settings
-from app.enums import CurrencyEnum, PeriodPreset, TimelineStep
+from app.enums import CurrencyEnum, PeriodPreset, PeriodSeries, ReportType, TimelineSeries, TimelineStep
 
 
 class AnalyticsQuery(BaseModel):
@@ -81,22 +81,50 @@ class SummaryResponse(BaseModel):
     previous: PreviousPeriod
 
 
+class CategoriesQuery(AnalyticsQuery):
+    type: ReportType = Field(ReportType.EXPENSE, description="Expenses or income")
+
+
+class CategoryDataset(BaseModel):
+    key: PeriodSeries
+    data: list[float] = Field(description="Amount of every category, in the order of labels")
+
+
+class CategoriesResponse(BaseModel):
+    """Chart.js data: labels and datasets go to a pie, doughnut or bar chart as they are."""
+
+    period: PeriodResponse
+    previous_period: PeriodResponse = Field(
+        description="The same days of the previous month, quarter or year, or a range of the same length right before"
+    )
+    currency: CurrencyEnum
+    wallet_id: int | None
+    type: ReportType
+    labels: list[str] = Field(
+        description="Categories of both periods, largest first; uncategorized for operations without a category"
+    )
+    datasets: list[CategoryDataset] = Field(description="The period and the previous one; 0 for a missing category")
+
+
 class TimelineQuery(AnalyticsQuery):
     group_by: TimelineStep | None = Field(
         None, description="Step of the points. By default days for a month or up to 62 days, months otherwise"
     )
 
 
-class TimelinePoint(BaseModel):
-    date: datetime.date = Field(description="First day of the step; a step cut by the period starts with it")
-    income: Decimal
-    expense: Decimal
-    net: Decimal
+class TimelineDataset(BaseModel):
+    key: TimelineSeries
+    data: list[float] = Field(description="Amount of every step, in the order of labels")
 
 
 class TimelineResponse(BaseModel):
+    """Chart.js data: labels and datasets go to the chart as they are."""
+
     period: PeriodResponse
     currency: CurrencyEnum
     wallet_id: int | None
     group_by: TimelineStep
-    points: list[TimelinePoint] = Field(description="Every step of the period, with zeros for steps without operations")
+    labels: list[datetime.date] = Field(
+        description="First day of every step of the period; a step cut by the period starts with it"
+    )
+    datasets: list[TimelineDataset] = Field(description="Income, expenses and net, with zeros for steps without them")
