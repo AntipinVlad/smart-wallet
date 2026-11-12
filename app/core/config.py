@@ -39,6 +39,16 @@ class Settings(BaseSettings):
     # Every parse request is a paid model call
     parse_rate_limit_per_user: int = Field(default=10, ge=1)
     parse_rate_limit_window_seconds: int = Field(default=60, ge=1)
+    # Every tips request that misses the cache is a paid model call
+    tips_rate_limit_per_user: int = Field(default=10, ge=1)
+    tips_rate_limit_window_seconds: int = Field(default=60, ge=1)
+    # Facts are in the key, so an entry never goes stale: the time only bounds the memory
+    tips_cache_ttl_seconds: int = Field(default=86400, ge=1)
+    # An expense category gets a warning when it is new or grew this much, and holds this share of expenses
+    # Tips compare a period with the average of this many periods before it
+    tips_baseline_periods: int = Field(default=3, ge=1)
+    tips_alert_min_growth_percent: float = Field(default=20.0, gt=0)
+    tips_alert_min_share_percent: float = Field(default=5.0, ge=0, le=100)
     openai_api_key: SecretStr
     openai_model: str = "gpt-6-luna"
     # The SDK default is 10 minutes: a hanging request would hold a worker slot that long

@@ -6,7 +6,9 @@ Operations can be entered as plain text: "coffee 85 from Monobank, taxi 200 cash
 
 Analytics shows income and expenses of a month, quarter, year or any range by category, compares them with the previous period, and draws them day by day, week by week or month by month. Reports can be in any currency: every operation is converted at the exchange rate of its own day.
 
-Next on the roadmap: AI tips based on these numbers, semantic search with pgvector, and an assistant that answers questions about your finances.
+AI tips explain these numbers in plain Ukrainian or English: what grew, what is new, what to watch. The code computes every number, the model only puts them into words, and every number in its answer is checked against the report.
+
+Next on the roadmap: semantic search with pgvector, and an assistant that answers questions about your finances.
 
 ## Features
 
@@ -14,7 +16,7 @@ Next on the roadmap: AI tips based on these numbers, semantic search with pgvect
 |---|---|---|
 | `POST /api/v1/users` | Register, with an IANA time zone such as `Europe/Kyiv` | — |
 | `GET /api/v1/users/me` | Current user | ✓ |
-| `PATCH /api/v1/users/me` | Change the time zone | ✓ |
+| `PATCH /api/v1/users/me` | Change the time zone or the language of AI tips | ✓ |
 | `POST /api/v1/auth/login` | Log in: sets the token cookies, attempts are rate limited | — |
 | `POST /api/v1/auth/refresh` | Get a new token pair with the refresh token | refresh cookie |
 | `POST /api/v1/auth/logout` | Revoke the refresh token and delete the cookies | — |
@@ -29,6 +31,7 @@ Next on the roadmap: AI tips based on these numbers, semantic search with pgvect
 | `GET /api/v1/analytics/summary` | Totals of a period by category and subcategory, compared with the previous period | ✓ |
 | `GET /api/v1/analytics/categories` | Expense or income categories of a period and of the previous one, as Chart.js data | ✓ |
 | `GET /api/v1/analytics/timeline` | Income and expenses of a period by day, week or month, as Chart.js data | ✓ |
+| `GET /api/v1/analytics/tips` | AI tips about a period in the user's language. Cached, rate limited per user | ✓ |
 | `GET /health/live` | The process is running | — |
 | `GET /health/ready` | The database answers | — |
 
@@ -84,6 +87,7 @@ flowchart LR
 - **Rate limiting.** Login attempts are counted in Redis by IP and by IP plus login, in one atomic Lua script. If Redis is down, login still works and the error is logged.
 - **Categorization.** After an income or expense is saved, the API puts a task into a Redis stream and answers at once. A separate worker asks the model for a category with structured outputs: the answer is always one value of a fixed enum such as `food.groceries`, so the model cannot invent a category. Until the worker is done, the operation has `category: null`. If Redis or OpenAI is unavailable, the operation is still saved, it only stays uncategorized.
 - **Text input.** The model gets three functions (add an expense, add an income, create a transfer) and calls one for every operation in the text. The schema of the functions is built for each request and lists only the user's own wallets, so the model cannot pick another one, and the code checks it again. The answer is a list of drafts: nothing is saved until the client sends a draft to the usual operation endpoints, which own all the money checks. Amounts in another currency are converted at the current rate, and the draft keeps what the user wrote. Dates like "yesterday" are resolved in the user's time zone.
+- **AI tips.** The summary of a period becomes facts with every difference, change status (new, gone, up, down) and largest change already computed, so the model has nothing to calculate. The code also decides what deserves a warning (a category or subcategory that is new or grew by 20% and holds 5% of expenses, or a negative net). Growth is measured against the average of the three periods before, once the user has that much history, so a spike against one cheap month is no alarm: the model only puts it into words. It answers in a fixed schema: a summary and up to five cards. Every number in the answer must be a number of the facts, rounding allowed; a card with any other number is dropped, an answer left without cards is a 502. Answers are cached in Redis under a hash of the facts, the prompt and the model: a new operation changes the facts, so the cache never needs clearing.
 - **Analytics.** A period is a range of days in the user's time zone: the current month by default, a month, quarter or year that holds a date, or a range up to ten years. SQL sums the operations by local day, currency and category and converts each sum at the rate of its day, then the service rounds the smallest parts first, so they always add up to the totals. Transfers between own wallets are not counted. A period still going on is compared with the same days of the previous one.
 - **Exchange rates by day.** Past rates never change, so they are stored in Postgres and never cleaned up: one API request per day fills every currency. Concurrent reports that need the same missing day share one load: in-process single flight, plus a Redis lock (`SET NX EX`, released by a Lua script) between processes, where a waiting process checks the database less and less often. If Redis is down, rates are loaded without the lock. New operations queue a task that loads the rates of their day ahead of the first report.
 - **Observability.** Every response has an `X-Request-ID` header, and every log line of that request carries the same id. Logs are plain text locally and JSON on servers.
@@ -93,7 +97,7 @@ app/
 ├── main.py          app setup: lifespan, middleware, routers
 ├── worker.py        taskiq broker and background tasks
 ├── run_worker.py    starts the worker
-├── ai/              AI features, one package per feature: categorization/, parsing/ (text to drafts)
+├── ai/              AI features, one package per feature: categorization/, parsing/ (text to drafts), tips/
 ├── api/             routes (v1/), dependencies, error handlers, middleware, health checks
 ├── services/        business logic
 ├── repository/      database queries
@@ -140,10 +144,14 @@ Settings are read from environment variables or from `.env`. All of them are lis
 | `DATABASE_URL` | ✓ | PostgreSQL connection string |
 | `REDIS_URL` | ✓ | Redis connection string |
 | `JWT_SECRET_KEY` | ✓ | Secret for signing access tokens, at least 32 characters |
-| `OPENAI_API_KEY` | ✓ | OpenAI API key for categorization and text input |
+| `OPENAI_API_KEY` | ✓ | OpenAI API key for categorization, text input and tips |
 | `OPENAI_MODEL` | | `gpt-6-luna` by default |
 | `POSTGRES_USER`, `POSTGRES_PASSWORD`, `POSTGRES_DB` | ✓ | Used by Docker Compose to create the database |
 | `PARSE_RATE_LIMIT_PER_USER`, `PARSE_RATE_LIMIT_WINDOW_SECONDS` | | Text input requests per user: 10 per 60 seconds by default |
+| `TIPS_RATE_LIMIT_PER_USER`, `TIPS_RATE_LIMIT_WINDOW_SECONDS` | | AI tips requests per user: 10 per 60 seconds by default |
+| `TIPS_CACHE_TTL_SECONDS` | | How long tips stay cached: a day by default |
+| `TIPS_ALERT_MIN_GROWTH_PERCENT`, `TIPS_ALERT_MIN_SHARE_PERCENT` | | When an expense category or subcategory gets a warning: new or grown by 20%, and at least 5% of expenses |
+| `TIPS_BASELINE_PERIODS` | | Tips compare with the average of this many periods before: 3 by default |
 | `EXCHANGE_API_HISTORY_URL`, `EXCHANGE_API_HISTORY_START` | | Rates of past days for analytics, and the first day the API has them |
 | `ANALYTICS_MAX_RANGE_DAYS` | | Longest report range: ten years by default |
 | `LOG_LEVEL`, `LOG_FORMAT` | | `INFO` and `text` by default. Use `json` on servers |
@@ -166,6 +174,7 @@ The quality of the AI features is measured separately, against the real model. E
 ```bash
 uv run python -m evals.run_categorization
 uv run python -m evals.run_parsing
+uv run python -m evals.run_tips
 ```
 
 Database schema changes:

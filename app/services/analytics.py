@@ -74,6 +74,22 @@ class TypeSummary(NamedTuple):
     categories: list[CategoryTotal]
 
 
+@dataclass(frozen=True)
+class Averages:
+    """Average of each period: a period without a category counts as 0 for it."""
+
+    total: Decimal
+    categories: dict[str, Decimal]
+    subcategories: dict[tuple[str, str], Decimal]
+
+
+@dataclass(frozen=True)
+class Baseline:
+    periods: list[PeriodResponse]
+    income: Averages
+    expense: Averages
+
+
 class ComparedGroups(NamedTuple):
     period: Period
     previous: Period
@@ -111,8 +127,8 @@ async def get_summary(
             income=income.previous_total,
             expense=expense.previous_total,
             net=income.previous_total - expense.previous_total,
-            income_change_percent=_change(income.total, income.previous_total),
-            expense_change_percent=_change(expense.total, expense.previous_total),
+            income_change_percent=change_percent(income.total, income.previous_total),
+            expense_change_percent=change_percent(expense.total, expense.previous_total),
         ),
     )
 
@@ -135,6 +151,34 @@ async def get_categories(
             CategoryDataset(key=PeriodSeries.CURRENT, data=_numbers(total.amount for total in totals)),
             CategoryDataset(key=PeriodSeries.PREVIOUS, data=_numbers(total.previous_amount for total in totals)),
         ],
+    )
+
+
+async def get_baseline(
+    db: AsyncSession, rate_loader: DailyRateLoader, current_user: User, query: AnalyticsQuery
+) -> Baseline | None:
+    """Averages of the periods before the period of the query; None until the user has data for all of them."""
+    await _check_wallet(db, current_user, query.wallet_id)
+    periods = []
+    period = _period(current_user, query)
+    for _ in range(settings.tips_baseline_periods):
+        period = period.previous()
+        periods.append(period)
+
+    first_day = await analytics_repository.first_operation_day(
+        db, current_user.id, current_user.timezone, query.wallet_id
+    )
+    if first_day is None or first_day > periods[-1].date_from:
+        logger.info(
+            "No baseline for user %s: first operation on %s, after %s", current_user.id, first_day, period.date_from
+        )
+        return None
+
+    groups = [await _group_sums(db, rate_loader, current_user, query, item) for item in periods]
+    return Baseline(
+        periods=[_period_response(item) for item in periods],
+        income=_averages(groups, OperationType.INCOME),
+        expense=_averages(groups, OperationType.EXPENSE),
     )
 
 
@@ -253,6 +297,25 @@ def _by_category(
     return TypeSummary(total, _total(previous), categories)
 
 
+def _averages(groups_by_period: list[list[GroupSum]], operation_type: OperationType) -> Averages:
+    categories: dict[str, Decimal] = defaultdict(Decimal)
+    subcategories: dict[tuple[str, str], Decimal] = defaultdict(Decimal)
+    for groups in groups_by_period:
+        for group in groups:
+            if group.type != operation_type:
+                continue
+            categories[group.category] += group.sum.amount
+            if group.subcategory is not None:
+                subcategories[group.category, group.subcategory] += group.sum.amount
+
+    count = len(groups_by_period)
+    return Averages(
+        total=(sum(categories.values(), Decimal(0)) / count).quantize(CENT),
+        categories={name: (amount / count).quantize(CENT) for name, amount in categories.items()},
+        subcategories={name: (amount / count).quantize(CENT) for name, amount in subcategories.items()},
+    )
+
+
 def _sums(groups: Iterable[GroupSum], operation_type: OperationType) -> Sums:
     sums: Sums = defaultdict(lambda: defaultdict(Sum))
     for group in groups:
@@ -275,11 +338,11 @@ def _compared(now: Sum, before: Sum, total: Decimal) -> ComparedFields:
         "share": float(round(now.amount / total * 100, 1)) if total else 0.0,
         "operations": now.operations,
         "previous_amount": before.amount,
-        "change_percent": _change(now.amount, before.amount),
+        "change_percent": change_percent(now.amount, before.amount),
     }
 
 
-def _change(amount: Decimal, previous_amount: Decimal) -> float | None:
+def change_percent(amount: Decimal, previous_amount: Decimal) -> float | None:
     # From nothing to something has no percent
     return float(round((amount - previous_amount) / previous_amount * 100, 1)) if previous_amount else None
 

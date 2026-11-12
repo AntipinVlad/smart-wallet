@@ -11,6 +11,8 @@ from app.schemas.analytics import (
     TimelineDataset,
     TimelineQuery,
     TimelineResponse,
+    TipResponse,
+    TipsResponse,
 )
 from app.schemas.auth import LoginRequest, TokenPair
 from app.schemas.common import Money
@@ -62,6 +64,8 @@ __all__ = [
     "TimelineDataset",
     "TimelineQuery",
     "TimelineResponse",
+    "TipResponse",
+    "TipsResponse",
     "TokenPair",
     "TotalBalance",
     "TransferDraft",

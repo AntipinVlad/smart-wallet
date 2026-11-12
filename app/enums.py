@@ -20,6 +20,11 @@ class CurrencyEnum(StrEnum):
     NZD = auto()
 
 
+class Language(StrEnum):
+    UK = auto()
+    EN = auto()
+
+
 class OperationType(StrEnum):
     EXPENSE = auto()
     INCOME = auto()
@@ -57,3 +62,9 @@ class ReportType(StrEnum):
 class PeriodSeries(StrEnum):
     CURRENT = auto()
     PREVIOUS = auto()
+
+
+class TipKind(StrEnum):
+    OBSERVATION = auto()
+    WARNING = auto()
+    ADVICE = auto()

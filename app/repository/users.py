@@ -1,6 +1,7 @@
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.enums import Language
 from app.models import User
 
 
@@ -12,8 +13,8 @@ async def get_user_by_id(db: AsyncSession, user_id: int) -> User | None:
     return await db.get(User, user_id)
 
 
-async def create_user(db: AsyncSession, login: str, password_hash: str, timezone: str) -> User:
-    user = User(login=login, password_hash=password_hash, timezone=timezone)
+async def create_user(db: AsyncSession, login: str, password_hash: str, timezone: str, language: Language) -> User:
+    user = User(login=login, password_hash=password_hash, timezone=timezone, language=language)
     db.add(user)
     await db.flush()
     return user

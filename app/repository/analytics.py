@@ -51,6 +51,18 @@ def _counted[*Ts](statement: Select[*Ts], operation_filter: OperationFilter) -> 
     return statement
 
 
+async def first_operation_day(db: AsyncSession, user_id: int, timezone: str, wallet_id: int | None) -> date | None:
+    """Local day of the first operation of any type: before it the user has no data, not zero spending."""
+    statement = (
+        select(cast(func.timezone(timezone, func.min(Operation.created_at)), Date))
+        .join(Wallet, Wallet.id == Operation.wallet_id)
+        .where(Wallet.user_id == user_id)
+    )
+    if wallet_id is not None:
+        statement = statement.where(Operation.wallet_id == wallet_id)
+    return await db.scalar(statement)
+
+
 async def days_in_other_currencies(
     db: AsyncSession, operation_filter: OperationFilter, currency: CurrencyEnum
 ) -> set[date]:
