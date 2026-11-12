@@ -32,7 +32,7 @@ from app.core.cookies import ACCESS_TOKEN_COOKIE
 from app.core.exceptions import ErrorCode
 from app.core.security import create_access_token, hash_password
 from app.database import Base
-from app.enums import CurrencyEnum, OperationType
+from app.enums import CurrencyEnum, Language, OperationType
 from app.main import app
 from app.models import Operation, User, Wallet
 
@@ -125,8 +125,8 @@ def db_session() -> Generator[Session, None, None]:
 
 @pytest.fixture()
 def make_user(db_session) -> Callable[..., User]:
-    def _make_user(login: str = "user", timezone: str = TIMEZONE) -> User:
-        user = User(login=login, password_hash=PASSWORD_HASH, timezone=timezone)
+    def _make_user(login: str = "user", timezone: str = TIMEZONE, language: Language = Language.UK) -> User:
+        user = User(login=login, password_hash=PASSWORD_HASH, timezone=timezone, language=language)
         db_session.add(user)
         db_session.commit()
         return user

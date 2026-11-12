@@ -5,7 +5,16 @@ from typing import Self
 from pydantic import BaseModel, Field, model_validator
 
 from app.core.config import settings
-from app.enums import CurrencyEnum, PeriodPreset, PeriodSeries, ReportType, TimelineSeries, TimelineStep
+from app.enums import (
+    CurrencyEnum,
+    Language,
+    PeriodPreset,
+    PeriodSeries,
+    ReportType,
+    TimelineSeries,
+    TimelineStep,
+    TipKind,
+)
 
 
 class AnalyticsQuery(BaseModel):
@@ -128,3 +137,22 @@ class TimelineResponse(BaseModel):
         description="First day of every step of the period; a step cut by the period starts with it"
     )
     datasets: list[TimelineDataset] = Field(description="Income, expenses and net, with zeros for steps without them")
+
+
+class TipResponse(BaseModel):
+    kind: TipKind = Field(
+        description="observation: a notable fact, warning: spending that grew, advice: a step to take"
+    )
+    category: str | None = Field(description="Category the card is about, as in the summary; null for the period")
+    text: str
+
+
+class TipsResponse(BaseModel):
+    """AI tips: every number in them is a number of the summary."""
+
+    period: PeriodResponse
+    currency: CurrencyEnum
+    wallet_id: int | None
+    language: Language
+    summary: str | None = Field(description="The period in two or three sentences; null if it has no operations")
+    tips: list[TipResponse]

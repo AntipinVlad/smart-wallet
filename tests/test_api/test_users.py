@@ -4,6 +4,7 @@ import pytest
 from sqlalchemy import select
 
 from app.core.security import hash_password
+from app.enums import Language
 from app.models import User
 from tests.conftest import OTHER_REQUEST_SECONDS, PASSWORD, TIMEZONE, Pause, assert_error
 
@@ -23,9 +24,18 @@ def test_create_user(client, db_session):
     # Assert
     assert response.status_code == 201
     user = db_session.scalars(select(User)).one()
-    assert response.json() == {"id": user.id, "login": "user", "timezone": TIMEZONE}
+    assert response.json() == {"id": user.id, "login": "user", "timezone": TIMEZONE, "language": "uk"}
     assert user.password_hash.startswith("$argon2id$")
-    assert user.timezone == TIMEZONE
+    assert (user.timezone, user.language) == (TIMEZONE, Language.UK)
+
+
+def test_create_user_with_language(client, db_session):
+    # Act
+    response = register(client, language="en")
+
+    # Assert
+    assert response.json()["language"] == "en"
+    assert db_session.scalars(select(User.language)).one() == Language.EN
 
 
 def test_create_user_stores_login_in_lower_case_without_spaces(client, db_session):
@@ -58,6 +68,7 @@ def test_create_user_login_taken_in_other_case(client, make_user):
         {"login": "user", "password": PASSWORD},
         {"login": "user", "password": PASSWORD, "timezone": "Mars/Olympus"},
         {"login": "user", "password": PASSWORD, "timezone": "+02:00"},
+        {"login": "user", "password": PASSWORD, "timezone": TIMEZONE, "language": "de"},
     ],
     ids=[
         "without_password",
@@ -67,6 +78,7 @@ def test_create_user_login_taken_in_other_case(client, make_user):
         "without_timezone",
         "unknown_timezone",
         "offset_instead_of_timezone",
+        "unknown_language",
     ],
 )
 def test_create_user_rejects_invalid_request(client, payload):
@@ -99,7 +111,7 @@ def test_get_me(client, make_user, auth):
 
     # Assert
     assert response.status_code == 200
-    assert response.json() == {"id": user.id, "login": user.login, "timezone": TIMEZONE}
+    assert response.json() == {"id": user.id, "login": user.login, "timezone": TIMEZONE, "language": "uk"}
 
 
 def test_update_timezone(client, db_session, make_user, auth):
@@ -110,13 +122,27 @@ def test_update_timezone(client, db_session, make_user, auth):
 
     # Assert
     assert response.status_code == 200
-    assert response.json() == {"id": user.id, "login": user.login, "timezone": "America/New_York"}
+    assert response.json() == {"id": user.id, "login": user.login, "timezone": "America/New_York", "language": "uk"}
     db_session.refresh(user)
-    assert user.timezone == "America/New_York"
+    assert (user.timezone, user.language) == ("America/New_York", Language.UK)
+
+
+def test_update_language_keeps_timezone(client, db_session, make_user, auth):
+    user = make_user()
+
+    # Act
+    response = update_me(client, auth, user, language="en")
+
+    # Assert
+    assert response.status_code == 200
+    db_session.refresh(user)
+    assert (user.timezone, user.language) == (TIMEZONE, Language.EN)
 
 
 @pytest.mark.parametrize(
-    "payload", [{}, {"timezone": "Mars/Olympus"}, {"timezone": None}], ids=["empty", "unknown_timezone", "null"]
+    "payload",
+    [{}, {"timezone": "Mars/Olympus"}, {"timezone": None}, {"language": "de"}, {"language": None}],
+    ids=["empty", "unknown_timezone", "null_timezone", "unknown_language", "null_language"],
 )
 def test_update_me_rejects_invalid_request(client, db_session, make_user, auth, payload):
     user = make_user()
@@ -127,7 +153,7 @@ def test_update_me_rejects_invalid_request(client, db_session, make_user, auth, 
     # Assert
     assert_error(response, 422, "VALIDATION_ERROR")
     db_session.refresh(user)
-    assert user.timezone == TIMEZONE
+    assert (user.timezone, user.language) == (TIMEZONE, Language.UK)
 
 
 def test_slow_password_hashing_does_not_block_other_requests(client, make_user, auth, monkeypatch, run_in_background):

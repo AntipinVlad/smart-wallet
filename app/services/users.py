@@ -21,7 +21,7 @@ async def create_user(db: AsyncSession, payload: UserCreateRequest) -> UserRespo
     # Slow on purpose: in a thread it does not block the event loop
     password_hash = await run_in_threadpool(hash_password, payload.password)
     try:
-        user = await user_repository.create_user(db, login, password_hash, payload.timezone)
+        user = await user_repository.create_user(db, login, password_hash, payload.timezone, payload.language)
         await db.commit()
     except IntegrityError as e:
         await db.rollback()
@@ -31,7 +31,9 @@ async def create_user(db: AsyncSession, payload: UserCreateRequest) -> UserRespo
 
 
 async def update_user(db: AsyncSession, current_user: User, payload: UserUpdateRequest) -> UserResponse:
-    current_user.timezone = payload.timezone
+    changes = payload.model_dump(exclude_unset=True)
+    for field, value in changes.items():
+        setattr(current_user, field, value)
     await db.commit()
-    logger.info("User %s changed time zone to %s", current_user.id, payload.timezone)
+    logger.info("User %s changed %s", current_user.id, changes)
     return UserResponse.model_validate(current_user)
