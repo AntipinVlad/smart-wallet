@@ -1,7 +1,7 @@
 from datetime import datetime
 from decimal import Decimal
 
-from sqlalchemy import Select, select
+from sqlalchemy import Select, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.enums import CurrencyEnum, OperationType
@@ -41,6 +41,19 @@ async def create_operation(
 
 async def get_operation_by_id(db: AsyncSession, operation_id: int) -> Operation | None:
     return await db.get(Operation, operation_id)
+
+
+async def operations_to_embed(db: AsyncSession, model: str, limit: int) -> list[Operation]:
+    """Operations whose description has no vector of this model yet; transfers have descriptions the app wrote."""
+    statement = (
+        select(Operation)
+        .where(Operation.description.is_not(None), Operation.description != "")
+        .where(Operation.type != OperationType.TRANSFER)
+        .where(or_(Operation.embedding.is_(None), Operation.embedding_model != model))
+        .order_by(Operation.id)
+        .limit(limit)
+    )
+    return list((await db.scalars(statement)).all())
 
 
 SORT_COLUMNS = {"created_at": Operation.created_at, "amount": Operation.amount}

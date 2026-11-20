@@ -3,8 +3,9 @@ from decimal import Decimal
 from enum import StrEnum
 from typing import Annotated, Literal
 
-from pydantic import AwareDatetime, BaseModel, Field, ValidationInfo, field_validator
+from pydantic import AwareDatetime, BaseModel, Field, StringConstraints, ValidationInfo, field_validator
 
+from app.core.config import settings
 from app.enums import CurrencyEnum, OperationType
 from app.schemas.common import PastDatetime, PositiveMoney
 from app.schemas.pagination import PageParams, sort_pattern
@@ -44,6 +45,15 @@ class OperationListQuery(PageParams):
     )
     wallet_id: int | None = None
     # A time zone is required: a naive time is ambiguous
+    date_from: AwareDatetime | None = None
+    date_to: AwareDatetime | None = None
+
+
+class OperationSearchQuery(BaseModel):
+    # Stripped first: a query of spaces would match every description a little
+    q: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=255)]
+    limit: int = Field(settings.default_page_size, ge=1, le=settings.max_page_size)
+    wallet_id: int | None = None
     date_from: AwareDatetime | None = None
     date_to: AwareDatetime | None = None
 
