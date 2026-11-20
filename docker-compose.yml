@@ -2,7 +2,7 @@ name: smart-wallet
 
 services:
   db:
-    image: postgres:17-alpine
+    image: pgvector/pgvector:0.8.7-pg17-bookworm
     environment:
       POSTGRES_USER: ${POSTGRES_USER:?}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?}
@@ -18,7 +18,7 @@ services:
       retries: 15
 
   db-test:
-    image: postgres:17-alpine
+    image: pgvector/pgvector:0.8.7-pg17-bookworm
     environment:
       POSTGRES_USER: wallet
       POSTGRES_DB: finance_test

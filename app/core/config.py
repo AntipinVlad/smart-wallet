@@ -42,6 +42,9 @@ class Settings(BaseSettings):
     # Every tips request that misses the cache is a paid model call
     tips_rate_limit_per_user: int = Field(default=10, ge=1)
     tips_rate_limit_window_seconds: int = Field(default=60, ge=1)
+    # Every search that misses the query vector cache is a paid embedding call; over the limit it is text only
+    search_rate_limit_per_user: int = Field(default=30, ge=1)
+    search_rate_limit_window_seconds: int = Field(default=60, ge=1)
     # Facts are in the key, so an entry never goes stale: the time only bounds the memory
     tips_cache_ttl_seconds: int = Field(default=86400, ge=1)
     # An expense category gets a warning when it is new or grew this much, and holds this share of expenses
@@ -51,10 +54,29 @@ class Settings(BaseSettings):
     tips_alert_min_share_percent: float = Field(default=5.0, ge=0, le=100)
     openai_api_key: SecretStr
     openai_model: str = "gpt-6-luna"
+    openai_embedding_model: str = "text-embedding-3-small"
+    # Texts per embeddings request of the backfill; the API takes at most 2048
+    embedding_backfill_batch_size: int = Field(default=500, ge=1, le=2048)
     # The SDK default is 10 minutes: a hanging request would hold a worker slot that long
     openai_timeout_seconds: float = Field(default=30.0, gt=0)
     # Ten years: a report over a longer range loads too many days of exchange rates the first time
     analytics_max_range_days: int = Field(default=3653, ge=1)
+    # Starting values of the search baseline: tuned on the dev queries of evals/run_search.py
+    # Below this word similarity an operation is not found by its description alone
+    search_min_word_similarity: float = Field(default=0.5, gt=0, le=1)
+    # Added to the score when a word of the query is a word of the description, not only similar to it
+    search_word_match_bonus: float = Field(default=0.5, ge=0)
+    search_category_match_bonus: float = Field(default=0.5, ge=0)
+    # Cosine distance, 0 is the same meaning and 1 unrelated; tuned on the dev queries of evals/run_search.py
+    search_max_vector_distance: float = Field(default=0.6, gt=0, le=2)
+    # Reciprocal rank fusion: the larger, the more being found by both searches outweighs the 1st place in one.
+    # 60 is the value of the original paper, not tuned: 16 dev queries are too few to tune it on
+    search_rrf_k: int = Field(default=60, ge=1)
+    # One short query to embed: answered in a fraction of a second, or the search falls back to text
+    search_embedding_timeout_seconds: float = Field(default=2.0, gt=0)
+    search_query_vector_ttl_seconds: int = Field(default=7 * 24 * 60 * 60, ge=1)
+    # A chat model answers slower than embeddings; past this the search goes on as typed
+    search_understanding_timeout_seconds: float = Field(default=5.0, gt=0)
     log_level: LogLevel = "INFO"
     log_format: LogFormat = "text"
 

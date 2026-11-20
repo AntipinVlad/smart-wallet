@@ -10,6 +10,7 @@ from taskiq import AsyncTaskiqDecoratedTask, Context, SendTaskError, TaskiqDepen
 from taskiq_redis import RedisStreamBroker
 
 from app.ai.categorization import service as categorization
+from app.ai.embeddings import service as embeddings
 from app.core.clients import create_http_session, create_openai_client, create_redis
 from app.core.config import settings
 from app.core.logging import request_id_var, setup_logging
@@ -22,6 +23,7 @@ QUEUE_NAME = "taskiq"
 # Stored in every queued message: renaming the function must not orphan tasks already in Redis
 CATEGORIZE_OPERATION_TASK = "categorize_operation"
 LOAD_EXCHANGE_RATES_TASK = "load_exchange_rates"
+EMBED_OPERATION_TASK = "embed_operation"
 
 broker = RedisStreamBroker(
     settings.redis_url,
@@ -60,6 +62,14 @@ async def categorize_operation_task(operation_id: int, context: Context = Taskiq
             await categorization.categorize_operation(db, openai_client, operation_id)
 
 
+@broker.task(task_name=EMBED_OPERATION_TASK)
+async def embed_operation_task(operation_id: int, context: Context = TaskiqDepends()) -> None:
+    openai_client: AsyncOpenAI = context.state.openai
+    with _request_id_of(context):
+        async with SessionLocal() as db:
+            await embeddings.embed_operation(db, openai_client, operation_id)
+
+
 @broker.task(task_name=LOAD_EXCHANGE_RATES_TASK)
 async def load_exchange_rates_task(day: str, context: Context = TaskiqDepends()) -> None:
     rate_loader: DailyRateLoader = context.state.rate_loader
@@ -83,6 +93,13 @@ async def enqueue_categorization(operation_id: int) -> None:
     if error is not None:
         # Fail open: the operation is saved, it only stays without a category
         logger.error("Operation %s not queued for categorization: %r", operation_id, error)
+
+
+async def enqueue_embedding(operation_id: int) -> None:
+    error = await _enqueue(embed_operation_task, operation_id)
+    if error is not None:
+        # Fail open: search finds the operation by text until the backfill embeds it
+        logger.error("Operation %s not queued for embedding: %r", operation_id, error)
 
 
 async def enqueue_exchange_rates(day: date) -> None:

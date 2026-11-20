@@ -1,0 +1,33 @@
+{"query": "кава", "group": "broad", "intent": "all", "split": "dev", "expected": ["coffee_morning", "coffee_latte", "coffee_beans", "starbucks"]}
+{"query": "таксі", "group": "broad", "intent": "all", "split": "dev", "expected": ["taxi_home", "uber"]}
+{"query": "продукти", "group": "broad", "intent": "all", "split": "dev", "expected": ["silpo", "atb", "coffee_beans"]}
+{"query": "аптека", "group": "broad", "intent": "all", "split": "dev", "expected": ["pharmacy", "vitamins"]}
+{"query": "транспорт", "group": "broad", "intent": "all", "split": "test", "expected": ["taxi_home", "uber", "metro", "fuel", "parking_fine", "car_service"]}
+{"query": "доставка їжі", "group": "broad", "intent": "all", "split": "test", "expected": ["pizza", "sushi_delivery"]}
+{"query": "відпустка в Карпатах", "group": "semantic", "intent": "all", "split": "dev", "expected": ["train_karpaty", "hotel_karpaty", "banosh", "hoverla_guide"]}
+{"query": "подарунки мамі", "group": "semantic", "intent": "all", "split": "dev", "expected": ["flowers_mom", "perfume_mom"]}
+{"query": "підписки", "group": "semantic", "intent": "all", "split": "dev", "expected": ["netflix", "spotify", "icloud", "chatgpt", "gym"]}
+{"query": "здоров'я", "group": "semantic", "intent": "all", "split": "dev", "expected": ["pharmacy", "vitamins", "dentist"]}
+{"query": "ремонт ноута", "group": "semantic", "intent": "one", "split": "dev", "expected": ["laptop_repair"]}
+{"query": "поїздка до Португалії", "group": "semantic", "intent": "all", "split": "test", "expected": ["flight_lisbon", "airbnb_lisbon"]}
+{"query": "житло", "group": "semantic", "intent": "all", "split": "test", "expected": ["rent", "electricity", "internet"]}
+{"query": "навчання", "group": "semantic", "intent": "all", "split": "test", "expected": ["python_course", "book"]}
+{"query": "coffee", "group": "cross_language", "intent": "all", "split": "dev", "expected": ["coffee_morning", "coffee_latte", "coffee_beans", "starbucks"]}
+{"query": "pharmacy", "group": "cross_language", "intent": "all", "split": "dev", "expected": ["pharmacy", "vitamins"]}
+{"query": "salary", "group": "cross_language", "intent": "one", "split": "dev", "expected": ["salary"]}
+{"query": "taxi", "group": "cross_language", "intent": "all", "split": "test", "expected": ["taxi_home", "uber"]}
+{"query": "gifts", "group": "cross_language", "intent": "all", "split": "test", "expected": ["flowers_mom", "perfume_mom", "gift_friend", "birthday_money"]}
+{"query": "каву", "group": "typo", "intent": "all", "split": "dev", "expected": ["coffee_morning", "coffee_latte", "coffee_beans", "starbucks"]}
+{"query": "такси", "group": "typo", "intent": "all", "split": "dev", "expected": ["taxi_home", "uber"]}
+{"query": "нетфлікс", "group": "typo", "intent": "one", "split": "dev", "expected": ["netflix"]}
+{"query": "стамотолог", "group": "typo", "intent": "one", "split": "dev", "expected": ["dentist"]}
+{"query": "бензін", "group": "typo", "intent": "one", "split": "test", "expected": ["fuel"]}
+{"query": "спотифай", "group": "typo", "intent": "one", "split": "test", "expected": ["spotify"]}
+{"query": "скільки я витратив на каву в жовтні", "group": "question", "intent": "all", "split": "dev", "expected": ["coffee_morning", "coffee_latte", "coffee_beans"]}
+{"query": "скільки коштувало таксі у вересні", "group": "question", "intent": "all", "split": "dev", "expected": ["uber"]}
+{"query": "що я дарував мамі", "group": "question", "intent": "all", "split": "dev", "expected": ["flowers_mom", "perfume_mom"]}
+{"query": "коли я був у стоматолога", "group": "question", "intent": "one", "split": "dev", "expected": ["dentist"]}
+{"query": "скільки я плачу за підписки", "group": "question", "intent": "all", "split": "test", "expected": ["netflix", "spotify", "icloud", "chatgpt", "gym"]}
+{"query": "скільки пішло на ліки", "group": "question", "intent": "all", "split": "test", "expected": ["pharmacy", "vitamins"]}
+{"query": "де я заправлявся в жовтні", "group": "question", "intent": "one", "split": "test", "expected": ["fuel"]}
+{"query": "коли востаннє замовляв піцу", "group": "question", "intent": "one", "split": "test", "expected": ["pizza"]}

@@ -12,7 +12,7 @@ from app.repository.pagination import paginate
 from app.schemas import OperationListQuery, OperationRequest, OperationResponse, Page, TransferRequest
 from app.services.exchange_service import get_exchange_rate
 from app.services.periods import local_day
-from app.worker import enqueue_categorization, enqueue_exchange_rates
+from app.worker import enqueue_categorization, enqueue_embedding, enqueue_exchange_rates
 
 TRANSFER_CATEGORY = "transfer"
 
@@ -131,5 +131,7 @@ async def transfer_between_wallets(
 async def _enqueue_background_work(operation: Operation, current_user: User) -> None:
     # After commit: before it the worker's own connection cannot see the operation yet
     await enqueue_categorization(operation.id)
+    # Its own task, not after categorization: the vector is of the description only and does not wait for the category
+    await enqueue_embedding(operation.id)
     # Ahead of the first report that needs them
     await enqueue_exchange_rates(local_day(operation.created_at, current_user.timezone))

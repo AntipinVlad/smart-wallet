@@ -1,4 +1,5 @@
 import asyncio
+import math
 import os
 import threading
 from collections.abc import Callable, Generator
@@ -28,6 +29,7 @@ from sqlalchemy import create_engine, text
 from sqlalchemy.orm import Session, sessionmaker
 
 from alembic import command
+from app.ai.embeddings.service import EMBEDDING_DIMENSIONS
 from app.core.cookies import ACCESS_TOKEN_COOKIE
 from app.core.exceptions import ErrorCode
 from app.core.security import create_access_token, hash_password
@@ -58,6 +60,13 @@ class Pause:
             return func(*args, **kwargs)
 
         return paused
+
+
+def at_angle(degrees: float) -> list[float]:
+    """A unit vector at this angle from at_angle(0): cosine distance is 1 - cos(angle)."""
+    vector = [0.0] * EMBEDDING_DIMENSIONS
+    vector[0], vector[1] = math.cos(math.radians(degrees)), math.sin(math.radians(degrees))
+    return vector
 
 
 def assert_error(response: httpx2.Response, status_code: int, code: str) -> dict[str, Any]:

@@ -1,0 +1,47 @@
+{"key": "coffee_morning", "type": "expense", "amount": "55.00", "currency": "uah", "description": "кава зранку", "category": "food.restaurants", "date": "2026-10-01"}
+{"key": "coffee_latte", "type": "expense", "amount": "90.00", "currency": "uah", "description": "лате в кав'ярні біля офісу", "category": "food.restaurants", "date": "2026-10-03"}
+{"key": "coffee_beans", "type": "expense", "amount": "620.00", "currency": "uah", "description": "зерна кави 1 кг", "category": "food.groceries", "date": "2026-10-05"}
+{"key": "starbucks", "type": "expense", "amount": "4.50", "currency": "usd", "description": "Starbucks cappuccino", "category": "food.restaurants", "date": "2026-09-20"}
+{"key": "lunch_cafe", "type": "expense", "amount": "340.00", "currency": "uah", "description": "обід у кафе з колегами", "category": "food.restaurants", "date": "2026-10-07"}
+{"key": "pizza", "type": "expense", "amount": "410.00", "currency": "uah", "description": "піца на вечір", "category": "food.delivery", "date": "2026-10-09"}
+{"key": "silpo", "type": "expense", "amount": "1250.00", "currency": "uah", "description": "Сільпо, продукти на тиждень", "category": "food.groceries", "date": "2026-10-11"}
+{"key": "atb", "type": "expense", "amount": "96.00", "currency": "uah", "description": "АТБ хліб і молоко", "category": "food.groceries", "date": "2026-10-12"}
+{"key": "sushi_delivery", "type": "expense", "amount": "780.00", "currency": "uah", "description": "доставка суші Glovo", "category": "food.delivery", "date": "2026-10-14"}
+{"key": "taxi_home", "type": "expense", "amount": "180.00", "currency": "uah", "description": "таксі додому", "category": "transport.taxi", "date": "2026-10-02"}
+{"key": "uber", "type": "expense", "amount": "25.00", "currency": "usd", "description": "Uber to the airport", "category": "transport.taxi", "date": "2026-09-18"}
+{"key": "metro", "type": "expense", "amount": "200.00", "currency": "uah", "description": "поповнення картки метро", "category": "transport.public", "date": "2026-10-01"}
+{"key": "fuel", "type": "expense", "amount": "2300.00", "currency": "uah", "description": "бензин WOG 40 л", "category": "transport.fuel", "date": "2026-10-06"}
+{"key": "parking_fine", "type": "expense", "amount": "340.00", "currency": "uah", "description": "штраф за паркування", "category": "transport.parking", "date": "2026-09-25"}
+{"key": "car_service", "type": "expense", "amount": "1800.00", "currency": "uah", "description": "заміна масла на СТО", "category": "transport.car_service", "date": "2026-09-12"}
+{"key": "train_karpaty", "type": "expense", "amount": "960.00", "currency": "uah", "description": "квитки на потяг до Ворохти", "category": "travel.tickets", "date": "2026-08-08"}
+{"key": "hotel_karpaty", "type": "expense", "amount": "4500.00", "currency": "uah", "description": "готель у Яремчі, 3 ночі", "category": "travel.accommodation", "date": "2026-08-09"}
+{"key": "banosh", "type": "expense", "amount": "520.00", "currency": "uah", "description": "банош і бринза в колибі", "category": "food.restaurants", "date": "2026-08-10"}
+{"key": "hoverla_guide", "type": "expense", "amount": "1200.00", "currency": "uah", "description": "гід на Говерлу", "category": "entertainment.events", "date": "2026-08-11"}
+{"key": "flight_lisbon", "type": "expense", "amount": "210.00", "currency": "eur", "description": "flight to Lisbon", "category": "travel.tickets", "date": "2026-06-02"}
+{"key": "airbnb_lisbon", "type": "expense", "amount": "480.00", "currency": "eur", "description": "Airbnb Lisbon apartment", "category": "travel.accommodation", "date": "2026-06-03"}
+{"key": "flowers_mom", "type": "expense", "amount": "850.00", "currency": "uah", "description": "квіти мамі на день народження", "category": "gifts.gifts", "date": "2026-09-14"}
+{"key": "perfume_mom", "type": "expense", "amount": "2400.00", "currency": "uah", "description": "парфуми для мами", "category": "gifts.gifts", "date": "2026-09-13"}
+{"key": "restaurant_mom", "type": "expense", "amount": "1900.00", "currency": "uah", "description": "вечеря з мамою в ресторані на її день народження", "category": "food.restaurants", "date": "2026-09-14"}
+{"key": "gift_friend", "type": "expense", "amount": "3000.00", "currency": "uah", "description": "подарунок Олегу на весілля", "category": "gifts.gifts", "date": "2026-07-19"}
+{"key": "charity", "type": "expense", "amount": "500.00", "currency": "uah", "description": "донат на ЗСУ", "category": "gifts.charity", "date": "2026-10-04"}
+{"key": "netflix", "type": "expense", "amount": "9.99", "currency": "usd", "description": "Netflix", "category": "entertainment.subscriptions", "date": "2026-10-01"}
+{"key": "spotify", "type": "expense", "amount": "5.99", "currency": "usd", "description": "Spotify Premium", "category": "entertainment.subscriptions", "date": "2026-10-01"}
+{"key": "icloud", "type": "expense", "amount": "2.99", "currency": "usd", "description": "iCloud 200 GB", "category": "entertainment.subscriptions", "date": "2026-10-02"}
+{"key": "chatgpt", "type": "expense", "amount": "20.00", "currency": "usd", "description": "ChatGPT Plus", "category": "entertainment.subscriptions", "date": "2026-10-03"}
+{"key": "gym", "type": "expense", "amount": "900.00", "currency": "uah", "description": "абонемент у спортзал на місяць", "category": "personal_care.sport", "date": "2026-10-01"}
+{"key": "pharmacy", "type": "expense", "amount": "320.00", "currency": "uah", "description": "аптека, ліки від застуди", "category": "health.pharmacy", "date": "2026-10-08"}
+{"key": "vitamins", "type": "expense", "amount": "280.00", "currency": "uah", "description": "вітаміни D3 в аптеці", "category": "health.pharmacy", "date": "2026-09-28"}
+{"key": "dentist", "type": "expense", "amount": "1500.00", "currency": "uah", "description": "стоматолог, пломба", "category": "health.doctor", "date": "2026-09-22"}
+{"key": "laptop_repair", "type": "expense", "amount": "2100.00", "currency": "uah", "description": "ремонт ноутбука, заміна клавіатури", "category": "shopping.electronics", "date": "2026-09-30"}
+{"key": "phone_case", "type": "expense", "amount": "350.00", "currency": "uah", "description": "чохол для телефону", "category": "shopping.electronics", "date": "2026-10-10"}
+{"key": "internet", "type": "expense", "amount": "250.00", "currency": "uah", "description": "домашній інтернет Київстар", "category": "housing.internet_phone", "date": "2026-10-01"}
+{"key": "rent", "type": "expense", "amount": "15000.00", "currency": "uah", "description": "оренда квартири за жовтень", "category": "housing.rent", "date": "2026-10-01"}
+{"key": "electricity", "type": "expense", "amount": "640.00", "currency": "uah", "description": "світло за вересень", "category": "housing.utilities", "date": "2026-10-05"}
+{"key": "python_course", "type": "expense", "amount": "3500.00", "currency": "uah", "description": "курс Python онлайн", "category": "education.courses", "date": "2026-09-05"}
+{"key": "book", "type": "expense", "amount": "700.00", "currency": "uah", "description": "книга Clean Code", "category": "education.books", "date": "2026-09-07"}
+{"key": "concert", "type": "expense", "amount": "1600.00", "currency": "uah", "description": "квитки на концерт", "category": "entertainment.events", "date": "2026-10-13"}
+{"key": "cinema", "type": "expense", "amount": "300.00", "currency": "uah", "description": "кіно з друзями", "category": "entertainment.events", "date": "2026-10-11"}
+{"key": "salary", "type": "income", "amount": "45000.00", "currency": "uah", "description": "зарплата за жовтень", "category": "salary.salary", "date": "2026-10-05"}
+{"key": "freelance", "type": "income", "amount": "600.00", "currency": "usd", "description": "freelance project payment", "category": "business.freelance", "date": "2026-10-09"}
+{"key": "cashback", "type": "income", "amount": "140.00", "currency": "uah", "description": "кешбек monobank", "category": "refunds.cashback", "date": "2026-10-01"}
+{"key": "birthday_money", "type": "income", "amount": "1000.00", "currency": "uah", "description": "гроші від бабусі на день народження", "category": "gifts.gift", "date": "2026-09-16"}

@@ -27,12 +27,14 @@ from app.schemas import (
     OperationListQuery,
     OperationRequest,
     OperationResponse,
+    OperationSearchQuery,
     Page,
     ParseRequest,
     TransferRequest,
 )
 from app.services import operation as operation_service
 from app.services import rate_limit
+from app.services import search as search_service
 
 router = APIRouter()
 
@@ -79,6 +81,21 @@ async def get_operations(
     current_user: User = Depends(get_current_user),
 ) -> Page[OperationResponse]:
     return await operation_service.get_operations_page(db, current_user, query)
+
+
+@router.get(
+    "/operations/search",
+    response_model=list[OperationResponse],
+    responses=error_responses(NotAuthenticatedError, WalletNotFoundError, validation=True),
+)
+async def search_operations(
+    query: Annotated[OperationSearchQuery, Query()],
+    db: AsyncSession = Depends(get_db),
+    openai_client: AsyncOpenAI = Depends(get_openai_client),
+    redis: Redis = Depends(get_redis),
+    current_user: User = Depends(get_current_user),
+) -> list[OperationResponse]:
+    return await search_service.search(db, openai_client, redis, current_user, query)
 
 
 @router.post(
